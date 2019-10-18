@@ -1,0 +1,33 @@
+crop,p_value,r2,site,a_est,b_est,d_est,a_se,b_se,d_se,phos_effect
+Linseed,<0.001,0.845,Rothamsted,1.21,0.369,-0.303,0.154,0.232,0.036,#NAME?
+Linseed,<0.001,0.845,Rothamsted,0.973,0.11,-0.259,0.16,0.118,0.0247,#NAME?
+Linseed,<0.001,0.594,Woburn,0.978,0.09,-0.286,0.091,0.081,0.032,#NAME?
+Linseed,<0.001,0.594,Woburn,0.94,0.098,-0.28,0.141,0.112,0.032,#NAME?
+Potato,0.006,0.059,Rothamsted,0.79,0.09,-0.31,0.13,0.21,0.149,NA
+Potato,0.006,0.059,Woburn,0.67,0.01,-0.25,0.04,0.02,0.007,NA
+Spring barley,<0.001,0.698,Rothamsted,1.228,0.287,-0.285,0.062,0.071,0.012,#NAME?
+Spring barley,<0.001,0.698,Rothamsted,1.297,0.622,-0.344,0.121,0.272,0.041,#NAME?
+Spring barley,<0.001,0.707,Woburn,1.236,0.276,-0.273,0.064,0.076,0.013,#NAME?
+Spring barley,<0.001,0.707,Woburn,1.542,1.271,-0.418,0.156,0.672,0.084,#NAME?
+Spring beans,< 0.001,0.603,Rothamsted,1.139,3.01,-0.87,0.368,7.83,1.44,NA
+Spring beans,< 0.001,0.603,Woburn,1.44,-7.6,1.01,1.01,32.1,6.07,NA
+Spring beans,< 0.001,0.592,Rothamsted,1.063,0.5,-0.35,0.09,0.24,0.04,NA
+Spring beans,< 0.001,0.592,Woburn,0.897,0.392,-0.33,1.22,0.272,0.059,NA
+Spring lupins,< 0.001,0.377,Rothamsted,0.761,0.058,-0.267,0.071,0.056,0.026,NA
+Spring lupins,< 0.001,0.377,Woburn,0.568,-0.26,-0.5,0.3,1.74,1.44,NA
+Spring oats,< 0.001,0.1,Rothamsted,0.78,0.007,-0.25,0.02,0.008,0.01,NA
+Spring oats,< 0.001,0.1,Woburn,0.92,0.128,-0.38,0.14,0.43,0.42,NA
+Winter oilseed rape,<0.001,0.619,Rothamsted,0.68,0.0165,-0.235,0.042,0.00973,0.0036,NA
+Winter oilseed rape,<0.001,0.619,Woburn,0.986,0.1065,-0.263,0.076,0.052,0.0128,NA
+Winter oilseed rape,<0.001,0.415,Rothamsted,0.747,0.009,-0.233,0.054,0.008,0.002,#NAME?
+Winter oilseed rape,<0.001,0.415,Rothamsted,1.19,0.89,-0.411,0.733,3.05,0.52,#NAME?
+Winter oilseed rape,<0.001,0.763,Woburn,0.93,0.046,-0.242,0.053,0.023,0.007,#NAME?
+Winter oilseed rape,<0.001,0.763,Woburn,1.08,0.275,-0.298,0.165,0.228,0.044,#NAME?
+Winter triticale,<0.001,0.81,Rothamsted,0.999,0.021,-0.249,0.022,0.007,0.003,#NAME?
+Winter triticale,<0.001,0.81,Rothamsted,0.95,0.075,-0.284,0.105,0.127,0.074,#NAME?
+Winter wheat,< 0.001,0.723,Rothamsted,1.076,0.123,-0.244,0.043,0.028,0.005,NA
+Winter wheat,< 0.001,0.723,Woburn,1.008,0.097,-0.232,0.046,0.027,0.005,NA
+Winter wheat,<0.001,0.819,Rothamsted,1.093,0.119,-0.244,0.047,0.029,0.005,#NAME?
+Winter wheat,<0.001,0.819,Rothamsted,1.027,0.142,-0.248,0.086,0.065,0.012,#NAME?
+Winter wheat,<0.001,0.594,Woburn,1.059,0.121,-0.235,0.07,0.049,0.011,#NAME?
+Winter wheat,<0.001,0.594,Woburn,0.883,0.042,-0.222,0.064,0.022,0.005,#NAME?
