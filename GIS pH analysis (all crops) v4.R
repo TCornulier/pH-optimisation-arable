@@ -1,6 +1,3 @@
-# set wd 
-setwd("~/Documents/SRUC/DEFRA Clean Growth Project/pH Optimisation/Extension for publication")
-
 # packages
 library(tidyverse)
 library(raster)

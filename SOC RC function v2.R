@@ -1,7 +1,4 @@
 
-# set wd
-setwd("~/Documents/SRUC/DEFRA Clean Growth Project/pH Optimisation/Extension for publication")
-
 # script to derive pH -> SOC response curve function for use in modelling studies
 library(tidyverse)
 
