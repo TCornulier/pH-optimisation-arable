@@ -208,33 +208,51 @@ Dat_main <- Dat_main %>%
 Dat_main$Soil_type %>% table()
 
 # match up yield response models to data
-Dat_yieldres <- read_csv("Holland et al. (2019) yield curves full data.csv")
-
-# function to find whether Rothamsted or Woburn has most similar soil type to grid cell (data based on Holland et al. (2019))
-expt_selector <- function(sand, silt, clay){
-  Roth <- c(28, 52, 20)
-  Wob <- c(71, 17, 12)
-  x <- (Roth - c(sand, silt, clay))^2 %>% sum()
-  y <- (Wob - c(sand, silt, clay))^2 %>% sum()
-  if(x <= y) z <- "Rothamsted"
-  if(x > y) z <- "Woburn"
-  return(z)
-}
-
-Dat_main <- Dat_main %>%
-  mutate(Holland_exptmatch = pmap_chr(list(Sand, Silt, Clay), expt_selector))
-
-# match crop types and import yield response parameters from Holland et al. (2019)
-Dat_cropmatch <- tibble(Crop = Dat_main$Crop %>% unique(),
-                        Holland_cropmatch = c("Spring barley", "Spring oats", NA, NA,
-                                              "Linseed", "Potato", "Spring beans", "Winter oilseed rape",
-                                              NA, NA, NA, "Winter wheat"))
+Dat_yieldres <- bind_rows(read_csv("Holland et al. (2019) yield curves full data.csv"),
+                          read_csv("Woodlands pH rotation model parameters.csv")) %>%
+  select(-p_value, -phos_effect)
 
 Dat_yieldres <- Dat_yieldres %>%
   group_by(crop, site) %>%
   summarise_at(vars(a_est:d_est), funs(mean(.))) %>%
-  dplyr::select(Holland_cropmatch = crop, Holland_exptmatch = site, a_est, b_est, d_est)
+  ungroup() %>%
+  mutate(Data_cropmatch = c("Barley", NA, "Oil crops, other", "Oil crops, other", "Cereals, other",
+                            "Potato", "Potato", "Potato", "Barley", "Barley",
+                            "Pulses, other", "Pulses, other", NA, NA, "Cereals, other",
+                            "Cereals, other", "Vegetable", "Wheat", "Rapeseed", "Rapeseed",
+                            "Cereals, other", "Wheat", "Wheat"),
+         Model_no = 1:nrow(Dat_yieldres))
 
+# function to select most appropriate yield response model for crop and soil type
+expt_select <- function(sand, silt, clay, crop_name){
+  
+  # soil sand-silt-clay fractions
+  Roth <- c(28, 52, 20)
+  Wob <- c(71, 17, 12)
+  Wood <- c(60, 30, 10) # based on typical values for Sandy Loam soil categorisation. Refine if possible.
+  
+  x <- tibble(Site = c("Rothamsted", "Woburn", "Woodlands"),
+         LSS = c((Roth - c(sand, silt, clay))^2 %>% sum(),
+                 (Wob - c(sand, silt, clay))^2 %>% sum(),
+                 (Wood - c(sand, silt, clay))^2 %>% sum())) %>%
+    left_join(Dat_yieldres %>%
+                filter(Data_cropmatch == crop_name) %>%
+                select(Model_no, Site = site),
+              by = "Site") %>%
+    drop_na() %>%
+    arrange(LSS) %>%
+    slice(1) %>%
+    pull(Model_no)
+  
+  if(length(x) == 0) x <- NA 
+  return(x)
+}
+
+Dat_main <- Dat_main %>%
+  mutate(Expt_match = pmap_chr(list(Sand, Silt, Clay, Crop), expt_select))
+
+
+######## CONTINUE TO WORK FROM HERE
 Dat_main <- Dat_main %>% 
   left_join(Dat_cropmatch, by = "Crop") %>%
   left_join(Dat_yieldres, by = c("Holland_cropmatch", "Holland_exptmatch"))
