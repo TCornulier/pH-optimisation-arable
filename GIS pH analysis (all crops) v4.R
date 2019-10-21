@@ -216,36 +216,35 @@ Dat_yieldres <- Dat_yieldres %>%
   group_by(crop, site) %>%
   summarise_at(vars(a_est:d_est), funs(mean(.))) %>%
   ungroup() %>%
-  mutate(Data_cropmatch = c("Barley", NA, "Oil crops, other", "Oil crops, other", "Cereals, other",
+  mutate(data_cropmatch = c("Barley", NA, "Oil crops, other", "Oil crops, other", "Cereals, other",
                             "Potato", "Potato", "Potato", "Barley", "Barley",
                             "Pulses, other", "Pulses, other", NA, NA, "Cereals, other",
                             "Cereals, other", "Vegetable", "Wheat", "Rapeseed", "Rapeseed",
-                            "Cereals, other", "Wheat", "Wheat"),
-         Model_no = 1:nrow(Dat_yieldres))
+                            "Cereals, other", "Wheat", "Wheat"))
+
+Dat_yieldres <- Dat_yieldres %>%
+  mutate(model_no = 1:nrow(Dat_yieldres))
+
+# soil fractions, based on HOlland paper for Rothamsted and Woburn, stated soil type/typical fractions for Woodlands — refine if possible
+Dat_soil <- tibble(site = c("Rothamsted", "Woburn", "Woodlands"),
+                   sand = c(28, 71, 60),
+                   silt = c(52, 17, 30),
+                   clay = c(20, 12, 10))
 
 # function to select most appropriate yield response model for crop and soil type
-expt_select <- function(sand, silt, clay, crop_name){
+# selects most similar soil type for which model is available
+expt_select <- function(sand2, silt2, clay2, crop_name){
+  x <- Dat_yieldres %>%
+    filter(data_cropmatch == crop_name)
   
-  # soil sand-silt-clay fractions
-  Roth <- c(28, 52, 20)
-  Wob <- c(71, 17, 12)
-  Wood <- c(60, 30, 10) # based on typical values for Sandy Loam soil categorisation. Refine if possible.
+  y <- Dat_soil %>%
+    filter(site %in% x$site) %>%
+    mutate(SS = (sand - sand2)^2 + (silt - silt2)^2 + (clay - clay2)^2) %>%
+    filter(SS == min(SS)) # selection using LSS method for sand/silt/clay fractions
   
-  x <- tibble(Site = c("Rothamsted", "Woburn", "Woodlands"),
-         LSS = c((Roth - c(sand, silt, clay))^2 %>% sum(),
-                 (Wob - c(sand, silt, clay))^2 %>% sum(),
-                 (Wood - c(sand, silt, clay))^2 %>% sum())) %>%
-    left_join(Dat_yieldres %>%
-                filter(Data_cropmatch == crop_name) %>%
-                select(Model_no, Site = site),
-              by = "Site") %>%
-    drop_na() %>%
-    arrange(LSS) %>%
-    slice(1) %>%
-    pull(Model_no)
-  
-  if(length(x) == 0) x <- NA 
-  return(x)
+  z <- x$model_no[match(y$site, x$site)]
+  if(length(z) == 0) z <- NA
+  return(z)
 }
 
 Dat_main <- Dat_main %>%
