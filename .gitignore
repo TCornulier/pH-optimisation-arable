@@ -5,4 +5,4 @@
 *.tif
 *.shp
 *.jar
-GIS data/
+Output plots/
