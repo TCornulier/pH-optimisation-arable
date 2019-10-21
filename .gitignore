@@ -2,3 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+*.tif
+*.shp
+*.jar
+GIS data/
