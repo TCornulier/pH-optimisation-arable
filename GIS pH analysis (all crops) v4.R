@@ -247,14 +247,12 @@ expt_select <- function(sand2, silt2, clay2, crop_name){
   return(z)
 }
 
+# match model to data (still feels like it takes longer than it should...)
 Dat_main <- Dat_main %>%
-  mutate(Expt_match = pmap_chr(list(Sand, Silt, Clay, Crop), expt_select))
+  mutate(model_no = pmap_dbl(list(Sand, Silt, Clay, Crop), expt_select))
 
-
-######## CONTINUE TO WORK FROM HERE
-Dat_main <- Dat_main %>% 
-  left_join(Dat_cropmatch, by = "Crop") %>%
-  left_join(Dat_yieldres, by = c("Holland_cropmatch", "Holland_exptmatch"))
+Dat_main <- Dat_main %>%
+  left_join(Dat_yieldres %>% select(model_no, Crop = data_cropmatch, a_est, b_est, d_est), by = c("model_no", "Crop"))
 
 # calculate relative yields at given pH and possible yields at target pH
 rel_yield <- function(A, B, D, pH){
@@ -290,8 +288,9 @@ Dat_main <- Dat_main %>%
 
 # EI for different crops in g CO2-eq per kg, data from Feedprint for on-farm production only
 # 'cereals, other' classed as oats, 'oil crops. other' classed as linseed, 'pulses, other' classed as beans
+# EI for vegetables based on root crops/onions/cabbages figure from Wallen et al. (2004) (Feedprint doesn't do vegetable EFs)
 Dat_EI <- tibble(Crop = Dat_main %>% pull(Crop) %>% unique(),
-                 EI = c(343, 465, 1222, 226, 766, 984, 349))
+                 EI = c(343, 465, 1222, 226, 766, 984, 500, 349))
 
 Dat_main <- Dat_main %>%
   left_join(Dat_EI, by = "Crop")
@@ -321,10 +320,11 @@ Dat_main <- Dat_main %>%
 
 # sale values for different crops from FMH 17/18, all in 2017 GBP
 # linseed uses OSR values, potatoes assumes dual purpose and price is weighted according to relative yields
+# vegetables takes data for potatoes — very similar to most veg prices
 Dat_saleval <- tibble(Crop = Dat_main %>% pull(Crop) %>% unique(),
-                      Maincrop_saleval = c(145, 155, 325, 113, 200, 325, 165),
-                      Bycrop_saleval = c(55, 50, 0, 0, 0, 0, 50), # secondary crop e.g. straw
-                      Bycrop_ratio = c(0.55, 0.60, 0, 0, 0, 0, 0.53)) # ratio of secondary crop to main crop yield
+                      Maincrop_saleval = c(145, 155, 325, 113, 200, 325, 113, 165),
+                      Bycrop_saleval = c(55, 50, 0, 0, 0, 0, 0, 50), # secondary crop e.g. straw
+                      Bycrop_ratio = c(0.55, 0.60, 0, 0, 0, 0, 0, 0.53)) # ratio of secondary crop to main crop yield
 
 # join sale values to main data
 Dat_main <- Dat_main %>% left_join(Dat_saleval, by = "Crop")
@@ -349,14 +349,12 @@ Dat_main <- Dat_main %>%
          Cost_net = Cost_net_ha * Area_ha,
          MAC = Cost_net / Abatement)
 
-# read in DA shapefiles and process so we can make plots at DA level
-DAs <- shapefile("GIS data/DA shapefile/GBR_adm_shp/GBR_adm1.shp")
-# ggplot() + geom_polygon(data = DAs, aes(x = long, y = lat, group = group), colour = "black", fill = NA) + coord_quickmap + theme_void()
+# process rasters so we can make plots at DA level
 template <- Master_stack[[1]]
-England <- template %>% mask(subset(DAs, DAs@data[["NAME_1"]]=="England"))
-Northern_Ireland <- template %>% mask(subset(DAs, DAs@data[["NAME_1"]]=="Northern Ireland"))
-Scotland <- template %>% mask(subset(DAs, DAs@data[["NAME_1"]]=="Scotland"))
-Wales <- template %>% mask(subset(DAs, DAs@data[["NAME_1"]]=="Wales"))
+England <- template %>% mask(subset(UK, UK@data[["NAME_1"]]=="England"))
+Northern_Ireland <- template %>% mask(subset(UK, UK@data[["NAME_1"]]=="Northern Ireland"))
+Scotland <- template %>% mask(subset(UK, UK@data[["NAME_1"]]=="Scotland"))
+Wales <- template %>% mask(subset(UK, UK@data[["NAME_1"]]=="Wales"))
 
 Eng_df <- England %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
 NI_df <- Northern_Ireland %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
