@@ -1,6 +1,6 @@
 # packages
-library(tidyverse)
 library(raster)
+library(tidyverse)
 library(sp)
 library(soiltexture)
 
@@ -210,8 +210,16 @@ Dat_main$Soil_type %>% table()
 # match up yield response models to data
 Dat_yieldres <- bind_rows(read_csv("Holland et al. (2019) yield curves full data.csv"),
                           read_csv("Woodlands pH rotation model parameters.csv")) %>%
-  select(-p_value, -phos_effect)
+  dplyr::select(-p_value, -phos_effect)
 
+# if r2 is less than 10%, assume no yield response (a = 1, b = 0, d = 0)
+# examination of the curves reveals all in this category are very flat anyway
+Dat_yieldres <- Dat_yieldres %>%
+  mutate(a_est = ifelse(r2 < 0.1, 1, a_est),
+         b_est = ifelse(r2 < 0.1, 0, b_est),
+         d_est = ifelse(r2 < 0.1, 0, d_est))
+
+# summarise and match models to crop data
 Dat_yieldres <- Dat_yieldres %>%
   group_by(crop, site) %>%
   summarise_at(vars(a_est:d_est), funs(mean(.))) %>%
@@ -225,7 +233,7 @@ Dat_yieldres <- Dat_yieldres %>%
 Dat_yieldres <- Dat_yieldres %>%
   mutate(model_no = 1:nrow(Dat_yieldres))
 
-# soil fractions, based on HOlland paper for Rothamsted and Woburn, stated soil type/typical fractions for Woodlands — refine if possible
+# soil fractions, based on Holland paper for Rothamsted and Woburn, stated soil type/typical fractions for Woodlands — refine if possible
 Dat_soil <- tibble(site = c("Rothamsted", "Woburn", "Woodlands"),
                    sand = c(28, 71, 60),
                    silt = c(52, 17, 30),
