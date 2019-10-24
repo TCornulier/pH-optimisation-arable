@@ -1,4 +1,5 @@
 # script to create plots and outputs for manuscript from script [GIS pH analysis (all crops) v4.R]
+#setwd("~/Documents/SRUC/DEFRA Clean Growth Project/pH Optimisation/Extension for publication/Output plots")
 
 # abatement map for UK
 Dat_summ1 <- Dat_main %>%
@@ -47,7 +48,7 @@ Dat_main %>%
             Abatement_ha = Abatement / Area_ha) %>%
   ggplot() +
   geom_raster(aes(x = x, y = y, fill = Abatement_ha), alpha = 0.7) +
-  geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
+  #geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
   scale_fill_gradient2(low = "darkred", mid = "lightgrey", high = "darkgreen") +
   labs(fill = expression("Abatement\npotential\n(tonnes CO"[2]*"-eq ha"^{-1}*")")) +
   coord_quickmap() +
@@ -70,7 +71,7 @@ Dat_summ2$MAC %>% summary()
 
 ggplot() +
   geom_raster(data = Dat_summ2, aes(x = x, y = y, fill = MAC)) +
-  #geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
+  geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
   #scale_fill_gradient(high = "red", low = "darkgreen") +
   labs(fill = expression('Marginal\nabatement\ncost\n(£ tonne CO'[2]*'-eq'^{-1}*')')) +
   coord_quickmap() +
@@ -82,14 +83,18 @@ Dat_summ3 <- Dat_main %>%
   group_by(x, y) %>%
   mutate(Dom_crop = Area_ha == max(Area_ha)) %>%
   filter(Dom_crop == T) %>%
-  dplyr::select(x, y, Crop)
+  dplyr::select(x, y, Crop) %>%
+  ungroup()
 
-Dat_summ3$Crop[834] <- "Oil crops, other" # cheeky hack to stop this getting dropped altogether - now the colour palette matches the MACCs
+# cheeky hack to stop non-dominant crops getting dropped altogether — now the colour palette matches the MACCs!
+Dat_summ3 <- Dat_summ3 %>%
+  add_row(Crop = "Oil crops, other") %>%
+  add_row(Crop = "Vegetable")
 
 qplot(Dat_summ3$Crop)
 ggplot() +
   geom_raster(data = Dat_summ3, aes(x = x, y = y, fill = Crop), alpha = 0.7) +
-  #geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
+  geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
   scale_fill_brewer(type = "qual", palette = "Set3") +
   coord_quickmap() +
   theme_void()
@@ -173,7 +178,7 @@ Dat_main %>% ggplot(aes(x = Crop, y = Yield_increase, fill = DA)) +
   geom_boxplot(outlier.shape = NA) +
   scale_fill_brewer(palette = "Set3") +
   ylim(c(1, 1.8)) +
-  labs(x = "", y = "Limed yield (fractional)", fill = "") +
+  labs(x = "", y = "Limed yield as fraction of non-limed yield", fill = "") +
   coord_flip() +
   theme_classic()
 # ggsave("Output plots/Fractional yield increase.png", width = 8, height = 4)
@@ -201,6 +206,15 @@ Dat_main %>%
   coord_flip() +
   theme_classic()
 # ggsave("Output plots/Additional crop production.png", width = 8, height = 3)
+
+# temp, diagnostic
+Dat_main %>%
+  filter(GHG_balance <= -0.1) %>%
+  mutate(Yield_inc_ktha = Yield_tha * (Yield_increase - 1) * 10^-3) %>%
+  left_join(Dat_yieldres %>% select(model_no, site), by = "model_no") %>%
+  ggplot(aes(x = Crop, y = Yield_inc_ktha, fill = site)) +
+  geom_boxplot() +
+  coord_flip()
 
 # table 2
 write_csv(Dat_saleval %>% dplyr::select(-Bycrop_ratio), "Output plots/Table 2.csv")
@@ -238,6 +252,8 @@ Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(GHGmit_SOC = GHGmit_SOC * Ar
 Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(GHGmit_yield = GHGmit_yield * Area_ha) %>% pull(GHGmit_yield) %>% sum() * 10^-3 # EI reduction total
 Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Tot_GHG = Tot_GHG * Area_ha) %>% pull(Tot_GHG) %>% sum() * 10^-3 # GHG emissions total
 Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Limedir_GHG = Limedir_GHG * Area_ha) %>% pull(Limedir_GHG) %>% sum() * 10^-3 # direct lime emissions total
+Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Limeemb_GHG = Limeemb_GHG * Area_ha) %>% pull(Limeemb_GHG) %>% sum() * 10^-3 # embedded lime emissions total
+Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Dies_GHG = Dies_GHG * Area_ha) %>% pull(Dies_GHG) %>% sum() * 10^-3 # fieldwork emissions total
 Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(GHGmit_SOC = GHGmit_SOC / Area_ha) %>% pull(GHGmit_SOC) %>% mean()
 
 # area between Hamilton's magic 5—6.7 bracket
@@ -290,3 +306,14 @@ Dat_main %>%
   coord_flip() +
   theme_classic()
 # ggsave("Output plots/Headline area x crop x DA.png", width = 8, height = 3)
+
+ggplot(SOC_dat %>% filter(Experiment != "Tu")) +
+  geom_point(aes(x = pH_std2, y = SOC_std2, shape = Experiment, colour = Experiment), alpha = 0.3) +
+  geom_smooth(aes(x = pH_std2, y = SOC_std2), method = "loess", span = 1, lty = 2, size = 0.5, colour = "black", se = T) +
+  scale_x_continuous(breaks = 3:8) +
+  xlim(c(3, 8)) +
+  ylim(c(0, 30)) +
+  labs(x = "pH, standardised",
+       y = expression("SOC stocks (g kg"^{-1}*"), standardised")) +
+  theme_classic()
+ggsave("Output plots/SOC model plot.png", width = 8, height = 4)
