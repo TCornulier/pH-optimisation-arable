@@ -4,30 +4,20 @@ library(tidyverse)
 library(sp)
 library(soiltexture)
 
-# read in countries shapefile
-# World_countries <- shapefile("GIS data/Country shapefile/countries.shp")
+data_repo <- "DEFRA Clean Growth Project/pH Optimisation/Extension for publication"
 
-# subset to UK
-# UK <- World_countries %>% subset(World_countries@data$ISO3=="GBR")
-# UK@bbox <- matrix(data = c(-8, 49, 6, 61), nrow = 2, ncol = 2) # redefine bounding box so we don't get Gibraltar etc.!
-# rm(World_countries)
-# plot(UK)
-
-UK <- shapefile("GIS data/DA shapefile/GBR_adm_shp/GBR_adm1.shp")
+UK <- find_onedrive(dir = data_repo, path = "GIS data/DA shapefile/GBR_adm_shp/GBR_adm1.shp") %>% shapefile()
 
 # read in soil raster data and stack
-Soil_stack <- stack(raster("GIS data/SoilGrids 5km/Soil pH/Fixed/PHIHOX_M_sl4_5km_ll.tif"), # pH
-                    raster("GIS data/SoilGrids 5km/Sand content/Fixed/SNDPPT_M_sl4_5km_ll.tif"), # Sand %
-                    raster("GIS data/SoilGrids 5km/Silt content/Fixed/SLTPPT_M_sl4_5km_ll.tif"), # Silt %
-                    raster("GIS data/SoilGrids 5km/Clay content/Fixed/CLYPPT_M_sl4_5km_ll.tif"), # Clay %
-                    # raster("GIS data/SoilGrids 5km/OC density/Fixed/OCDENS_M_sl4_5km_ll.tif"), # OC kg per m3
-                    # raster("GIS data/SoilGrids 5km/OC g per kg/Fixed/ORCDRC_M_sl4_5km_ll.tif"), # OC g per kg
-                    raster("GIS data/SoilGrids 5km/OC tonnes per ha/Fixed/OCSTHA_M_sd4_5km_ll.tif")) # OC tonnes per ha
+Soil_stack <- stack(find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Soil pH/Fixed/PHIHOX_M_sl4_5km_ll.tif") %>% raster(), # pH
+                    find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Sand content/Fixed/SNDPPT_M_sl4_5km_ll.tif"), # sand %
+                    find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Silt content/Fixed/SLTPPT_M_sl4_5km_ll.tif"), # silt %
+                    find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Clay content/Fixed/CLYPPT_M_sl4_5km_ll.tif"), # clay %
+                    find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/OC tonnes per ha/Fixed/OCSTHA_M_sd4_5km_ll.tif")) # OC tonnes per ha
 
 # read in crop area raster data and stack
-readdir <- "GIS data/MapSPAM data/Physical area" # set to correct directory for conversions (ensure folder named "Fixed" is created to deposit transformed rasters into)
+readdir <- find_onedrive(dir = data_repo, path = "GIS data/MapSPAM data/Physical area")
 file.names <- dir(readdir, pattern =".tif")
-# file.names <- file.names[file.names %>% str_detect("barley|bean|cereal|cowpea|fruit_temperate|maize|millet|oil_crops|potato|rapeseed|sorghum|sugar_beet|vegetable")] # not sexy but it'll slim things down a bit for now
 
 Crop_area_stack <- raster::stack()
 for(i in 1:length(file.names)){
@@ -39,7 +29,7 @@ for(i in 1:length(file.names)){
 }
 
 # read in crop yield raster data and stack
-readdir <- "GIS data/MapSPAM data/Yield"
+readdir <- find_onedrive(dir = data_repo, path = "GIS data/MapSPAM data/Yield")
 file.names <- dir(readdir, pattern =".tif")
 
 Crop_yield_stack <- raster::stack()
