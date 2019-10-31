@@ -2,6 +2,8 @@
 # script to derive pH -> SOC response curve function for use in modelling studies
 library(tidyverse)
 
+data_repo <- "DEFRA Clean Growth Project/pH Optimisation/Extension for publication"
+
 set.seed(2605)
 sim_n = round(10^3 / 4, 0)
 Roth_dat <- tibble(pH = c(rnorm(n = sim_n, mean = 3.45, sd = 0.01),
@@ -94,7 +96,7 @@ ggplot(SOC_dat) +
   labs(x = "pH, standardised",
        y = expression("SOC stocks (g kg"^{-1}*"), standardised")) +
   theme_classic()
-#ggsave("Output plots/SOC model plot.png", width = 8, height = 5)
+#ggsave(find_onedrive(dir = data_repo, path = "Output plots/SOC model plot.png"), width = 8, height = 5)
 
 ggplot(SOC_dat %>% filter(Experiment != "Tu")) +
   geom_point(aes(x = pH_std2, y = SOC_std2, colour = Experiment), alpha = 0.1) +
@@ -105,7 +107,7 @@ ggplot(SOC_dat %>% filter(Experiment != "Tu")) +
   labs(x = "pH, standardised",
        y = expression("SOC stocks (g kg"^{-1}*"), standardised")) +
   theme_classic()
-ggsave("Output plots/SOC model plot.png", width = 8, height = 4)
+#ggsave(find_onedrive(dir = data_repo, "Output plots/SOC model plot.png"), width = 8, height = 4)
 
 SOC_RC_model <- loess(SOC_std2 ~ pH_std2, data = SOC_dat %>% filter(Experiment != "Tu"), span = 1)
 
