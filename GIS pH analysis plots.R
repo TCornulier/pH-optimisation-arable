@@ -219,16 +219,30 @@ Dat_main %>%
 # table 2
 write_csv(Dat_saleval %>% dplyr::select(-Bycrop_ratio), "Output plots/Table 2.csv")
 
+#######################################################################################################################
 # results descriptives
-d1 <- Dat_main %>% pull(Area_ha) %>% sum() * 10^-3 # total area (kha)
+#######################################################################################################################
+
+##############
+# area stats
+#############
+
+# total area (kha)
+d1 <- Dat_main %>% pull(Area_ha) %>% sum() * 10^-3
 print(d1)
 
-d2 <- Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Area_ha) %>% sum() * 10^-3 # area with abatement
+# area with abatement (kha)
+d2 <- Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Area_ha) %>% sum() * 10^-3 
 print(d2)
 
+# fractional area with abatement
 d2 / d1 # area with abatement
-Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Limerate) %>% mean() # average 5-year lime rate
-Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Abatement) %>% sum() * 10^-3 # abatement in kt
+
+# average 5-year lime rate
+Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Limerate) %>% mean() 
+
+# abatement in kt
+Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Abatement) %>% sum() * 10^-3
 
 # overall yield increase in kt
 Dat_main %>%
@@ -247,36 +261,79 @@ Dat_main %>%
   pull(Yield_inc_kt) %>%
   sum()
 
+#####################
 # emissions + abatement
-Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(GHGmit_SOC = GHGmit_SOC * Area_ha) %>% pull(GHGmit_SOC) %>% sum() * 10^-3 # SCS total
-Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(GHGmit_yield = GHGmit_yield * Area_ha) %>% pull(GHGmit_yield) %>% sum() * 10^-3 # EI reduction total
-Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Tot_GHG = Tot_GHG * Area_ha) %>% pull(Tot_GHG) %>% sum() * 10^-3 # GHG emissions total
-Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Limedir_GHG = Limedir_GHG * Area_ha) %>% pull(Limedir_GHG) %>% sum() * 10^-3 # direct lime emissions total
-Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Limeemb_GHG = Limeemb_GHG * Area_ha) %>% pull(Limeemb_GHG) %>% sum() * 10^-3 # embedded lime emissions total
-Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Dies_GHG = Dies_GHG * Area_ha) %>% pull(Dies_GHG) %>% sum() * 10^-3 # fieldwork emissions total
+####################
+
+# SCS total
+Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(GHGmit_SOC = GHGmit_SOC * Area_ha) %>% pull(GHGmit_SOC) %>% sum() * 10^-3
+
+# EI reduction total
+Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(GHGmit_yield = GHGmit_yield * Area_ha) %>% pull(GHGmit_yield) %>% sum() * 10^-3
+
+# GHG emissions total
+Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Tot_GHG = Tot_GHG * Area_ha) %>% pull(Tot_GHG) %>% sum() * 10^-3
+
+# direct lime emissions total
+Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Limedir_GHG = Limedir_GHG * Area_ha) %>% pull(Limedir_GHG) %>% sum() * 10^-3
+
+# embedded lime emissions total
+Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Limeemb_GHG = Limeemb_GHG * Area_ha) %>% pull(Limeemb_GHG) %>% sum() * 10^-3
+
+# fieldwork emissions total
+Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Dies_GHG = Dies_GHG * Area_ha) %>% pull(Dies_GHG) %>% sum() * 10^-3
+
+# GHG mitigation by SCS per hectare
 Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(GHGmit_SOC = GHGmit_SOC / Area_ha) %>% pull(GHGmit_SOC) %>% mean()
 
-# area between Hamilton's magic 5—6.7 bracket
+# fractional area between Hamilton's magic 5—6.7 bracket
 d3 <- Dat_main %>% pull(Area_ha) %>% sum() # total area
 d4 <- Dat_main %>% filter(pH >= 5, pH <= 6.7) %>% pull(Area_ha) %>% sum()
 d4
 d4/d3
 
+#############
+# assumptions 
+#############
+
+# abatement in kt w/ basic assumptions from model
+Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Abatement) %>% sum() * 10^-3
+
+# abatement in kt w/ optomistic assumptions (assume no direct lime emissions)
+Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Abatement = Abatement + Limedir_GHG * Area_ha) %>% pull(Abatement) %>% sum() * 10^-3
+
+# abatement in kt w/ pessimistic assumptions (assume no crop EI offset)
+Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Abatement = Abatement - GHGmit_yield * Area_ha) %>% pull(Abatement) %>% sum() * 10^-3
+
+################
 # costs and benefits
+##################
+
+# cost of measure on area with net abatement
 d5 <- Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(x = Area_ha * (Lime_cost + Cont_cost)) %>% pull(x) %>% sum()
 d5 / (d2 * 10^3)
+
+# revenue from crop yield increase on area with net abatement
 d6 <- Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(x = Area_ha * Crop_revenue_net) %>% pull(x) %>% sum()
 d6 / (d2 * 10^3)
 
+# revenue from crop yield increase on total area
+d7 <- Dat_main %>% mutate(x = Area_ha * Crop_revenue_net) %>% pull(x) %>% sum()
+d7 / (d1 * 10^3)
+
+# marginal abatement cost, overall average
 d7 <- Dat_main %>% filter(GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), MAC <= quantile(MAC, 0.95)) %>% mutate(x = Area_ha * MAC) %>% pull(x) %>% sum()
 d7 / (d2 * 10^3)
 
+# MAC 95% CI
 Dat_main %>% filter(GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), MAC <= quantile(MAC, 0.95)) %>% pull(MAC) %>% quantile(c(0.025, 0.975))
 
+# abatement available below SCC (£66.10)
 d8 <- Dat_main %>% filter(GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), MAC <= quantile(MAC, 0.95)) %>% nrow()
 d9 <- Dat_main %>% filter(GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), MAC <= quantile(MAC, 0.95)) %>% filter(MAC <= 66.1) %>% nrow()
 d9/d8
 
+# abatement fractions by DA
 Dat_main %>%
   filter(GHG_balance <= -0.1) %>%
   filter(MAC <= 66.1) %>%
