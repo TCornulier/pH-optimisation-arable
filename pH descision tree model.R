@@ -31,7 +31,11 @@ preds <- tibble(actual = Dat_test$has_ce_abatement, predict_prob = ypred) %>%
   mutate(predict_class = as.numeric(predict_prob >= 0.5))
 
 # confusion matrix
-table(preds$actual, preds$predict_class) # preds across top, actual down side
+confmat <- table(preds$actual, preds$predict_class) # preds across top, actual down side
+print(confmat)
+(confmat[1, 1] + confmat [2, 2]) / sum(confmat) # prediction accuracy
+confmat[2, 1] / sum(confmat) # false negative
+confmat[1, 2] / sum(confmat) # false positive
 
 # plot decision tree
 plot(classifier)
