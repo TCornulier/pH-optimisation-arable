@@ -239,28 +239,30 @@ print(d2)
 d2 / d1 # area with abatement
 
 # average 5-year lime rate
-Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Limerate) %>% mean() 
+Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Limerate) %>% mean() * 5
 
 # abatement in kt
 Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Abatement) %>% sum() * 10^-3
 
 # overall yield increase in kt
-Dat_main %>%
+yield_inc <- Dat_main %>%
   mutate(Yield_inc_ktha = Yield_tha * (Yield_increase - 1) * 10^-3,
          Yield_inc_kt = Yield_inc_ktha * Area_ha) %>%
   pull(Yield_inc_kt) %>%
   sum()
+
+yield_inc / d1
 # equal to about 362 kg / ha over ENTIRE area
 
 
 # yield increase in kt only in areas where net abatement is possible
-Dat_main %>%
+yield_inc_ab <- Dat_main %>%
   filter(GHG_balance <= -0.1) %>%
   mutate(Yield_inc_ktha = Yield_tha * (Yield_increase - 1) * 10^-3,
          Yield_inc_kt = Yield_inc_ktha * Area_ha) %>%
   pull(Yield_inc_kt) %>%
   sum()
-
+yield_inc_ab / d2
 #####################
 # emissions + abatement
 ####################
