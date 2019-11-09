@@ -1,6 +1,8 @@
 # script to create plots and outputs for manuscript from script [GIS pH analysis (all crops) v4.R]
 #setwd("~/Documents/SRUC/DEFRA Clean Growth Project/pH Optimisation/Extension for publication/Output plots")
 
+data_repo <- "DEFRA Clean Growth Project/pH Optimisation/Extension for publication"
+
 # abatement map for UK
 Dat_summ1 <- Dat_main %>%
   group_by(x, y) %>%
@@ -99,6 +101,15 @@ ggplot() +
   coord_quickmap() +
   theme_void()
 # ggsave("Output plots/Dominant arable crop map UK.png", width = 8, height = 7)
+
+# pH map of UK
+ggplot() +
+  geom_raster(data = Dat_main, aes(x = x, y = y, fill = pH), alpha = 0.7) +
+  geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
+  coord_quickmap() +
+  scale_fill_gradient(low = "coral3", high = "cadetblue3") +
+  theme_void()
+#ggsave(find_onedrive(dir = data_repo, path = "Output plots/UK pH map.png"), width = 8, height = 7)
 
 # how much land area is lost by removing unmatched crops?
 Dat_cdf %>%
@@ -334,6 +345,10 @@ Dat_main %>% filter(GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), 
 d8 <- Dat_main %>% filter(GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), MAC <= quantile(MAC, 0.95)) %>% nrow()
 d9 <- Dat_main %>% filter(GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), MAC <= quantile(MAC, 0.95)) %>% filter(MAC <= 66.1) %>% nrow()
 d9/d8
+
+# % of total uk emissions and uk agricultural emissions
+abatement_Mt <- Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Abatement) %>% sum() * 10^-6
+abatement_Mt / 45.59 * 10^2 # % of ag emissions
 
 # abatement fractions by DA
 Dat_main %>%
