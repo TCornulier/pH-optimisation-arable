@@ -19,7 +19,7 @@ newproj <- crs(Ras_pH)
 Ras_corine_UK <- Ras_corine_UK %>% projectRaster(crs = newproj)
 
 # checks
-#Ras_corine_GB %>% plot()
+#Ras_corine_UK %>% plot()
 #Ras_pH %>% plot(add = T)
 
 # read in UK DA shapefiles and crop pH and corine rasters
@@ -49,19 +49,3 @@ Ras_pasture_ag %>%
 writeRaster(Ras_corine_UK, find_onedrive(dir = bigdata_repo, path = "Created rasters/Corine-land-cover-100m-UKonly-WGS84.tif"))
 writeRaster(Ras_pasture_ag, find_onedrive(dir = bigdata_repo, path = "Created rasters/UK-pasture-area-10km-CLC-based-WGS84.tif"))
 
-# read in raw data for Defra's grass growth model and raster for grass growth class to parameterise
-# we're borrowing from another project here — so pulling project files directly from that project's repo
-Dat_GGM <- find_onedrive(dir = "AgRE Calc PLC/Soil C methodology/Model update/Data preprocessing/Defra RB209 grass model",
-                         path = "Grass model digitisation raw.csv") %>%
-  read_csv()
-
-Ras_GGC <- find_onedrive(dir = bigdata_repo, path = "Created rasters/Defra_RB209_grass_growth_class_UK_250m.tif") %>% raster()
-plot(Ras_GGC)
-plot(Shp_UK, add = T)
-#Ras_GGC <- projectRaster(Ras_GGC, crs = newproj)
-# something funky going on here. Raster was created with WGS84 projection, saved with none, and now won't line up..!
-
-Ras_GGC_ag <- resample(Ras_GGC, Ras_pH)
-Ras_GGC %>% plot()
-Ras_pH %>% plot(add = T)
-Ras_GGC_ag %>% plot()
