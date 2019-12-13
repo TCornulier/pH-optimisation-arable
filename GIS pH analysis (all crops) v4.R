@@ -56,6 +56,16 @@ Master_stack <- Master_stack %>% crop(UK) %>% mask(UK)
 plot(Master_stack[[1]])
 # plot(UK, add=T)
 
+# add in pasture area and yield data to master stack
+pasture_area <- find_onedrive(dir = "GIS data repository", path = "Created rasters/UK-pasture-area-10km-CLC-based-WGS84-2.tif") %>% raster()
+pasture_yield <- find_onedrive(dir = "GIS data repository", path = "Created rasters/UK-pasture-yield-RB209-10km.tif") %>% raster()
+
+# resample
+pasture_area <- pasture_area %>% resample(Master_stack)
+pasture_yield <- pasture_yield %>% resample(Master_stack)
+
+Master_stack <- stack(Master_stack, pasture_area, pasture_yield)
+
 # convert to dataframe
 Dat_main <- Master_stack %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
 # we have zeros, >0s and NAs in the area data, NAs and >0s only in the yield data
@@ -69,7 +79,9 @@ Dat_main <- Dat_main %>%
          Silt = SLTPPT_M_sl4_5km_ll,
          Clay = CLYPPT_M_sl4_5km_ll,
          OC = OCSTHA_M_sd4_5km_ll,
-         Cell_area_km2 = layer) %>%
+         Cell_area_km2 = layer,
+         phys_area_pasture = UK.pasture.area.10km.CLC.based.WGS84.2,
+         yield_pasture = UK.pasture.yield.RB209.10km) %>%
   mutate(pH = pH / 10) # for some reason it's * 10 in original raster
 
 glimpse(Dat_main)
@@ -83,6 +95,10 @@ isnt_zero <- function(x){
 
 Dat_main <- Dat_main %>%
   select_if(isnt_zero)
+
+# convert pasture area from km2 to ha
+Dat_main <- Dat_main %>%
+  mutate(phys_area_pasture = phys_area_pasture * 10^6 / 10^4)
 
 # gather up into crop types and metrics (area/yield)
 # function to help rename crop variables
@@ -129,13 +145,20 @@ Dat_cdf_av <- Dat_cdf %>%
   mutate(Area_cum = cumsum(Area_ha),
          Freq = Area_cum / max(Area_cum))
 
-ggplot(Dat_cdf) +
+ggplot(Dat_cdf %>% filter(Crop != "Rest of crops")) + # we lose 913 ha of average land, and mean we have a neat 12 crops for our facets, not unlucky 13..!
   geom_line(aes(x = pH, y = Freq), colour = "darkred") +
   geom_line(data = Dat_cdf_av, aes(x = pH, y = Freq), colour = "grey", lty = 2) +
   facet_wrap(~Crop, nrow = 4) +
   labs(x = "pH", y = "Frequency") +
   theme_classic()
 # ggsave("Output plots/pH CDFs, all crops.png", width = 8, height = 6)
+
+########
+
+# script tested + modified to include pasture up to this stage
+
+########
+
 
 # pH relationship with yield
 Dat_main %>%
