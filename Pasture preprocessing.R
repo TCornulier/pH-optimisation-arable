@@ -4,28 +4,12 @@ library(sp)
 
 bigdata_repo <- "GIS data repository"
 
-Ras_corine <- find_onedrive(dir = bigdata_repo, path = "Corine raster 100m/CLC2018_CLC2018_V2018_20.tif") %>% raster()
-#plot(Ras_corine)
+# running script from here using ArcGIS pre-processed files
+Ras_corine_UK <- find_onedrive(dir = bigdata_repo, path = "Created rasters/Corine-land-cover-100m-UKonly-WGS84-3.tif") %>% raster()
+Ras_pH_UK <- find_onedrive(dir = bigdata_repo, path = "Created rasters/Soil-grids-5km-pH-UKonly.tif") %>% raster()
 
-# read in pH raster as template
-Ras_pH <- find_onedrive(dir = bigdata_repo, path = "SoilGrids 5km/Soil pH/Fixed/PHIHOX_M_sl4_5km_ll.tif") %>% raster()
-
-# manually crop Corine to extent of GB only (it's a bit clunky, but much faster than reprojecting all of Europe...)
-ext <- extent(3.0*10^6, 3.9*10^6, 3.0*10^6, 4.4*10^6)
-Ras_corine_UK <- Ras_corine %>% crop(ext)
-
-# reproject corine raster to WGS84
-newproj <- crs(Ras_pH)
-Ras_corine_UK <- Ras_corine_UK %>% projectRaster(crs = newproj)
-
-# checks
-#Ras_corine_UK %>% plot()
-#Ras_pH %>% plot(add = T)
-
-# read in UK DA shapefiles and crop pH and corine rasters
+# read in UK shapefile (inc DA's)
 Shp_UK <- find_onedrive(dir = bigdata_repo, path = "DA shapefile/GBR_adm_shp/GBR_adm1.shp") %>% shapefile()
-Ras_pH <- Ras_pH %>% crop(Shp_UK) %>% mask(Shp_UK)
-Ras_corine_UK <- Ras_corine_UK %>% crop(Shp_UK) %>% mask(Shp_UK)
 
 # adjust corine raster to show 1 for pasture, 0 for not pasture, NA for missing data
 Ras_pasture <- Ras_corine_UK
@@ -33,9 +17,17 @@ Ras_pasture[Ras_corine_UK == 231] <- 1
 Ras_pasture[Ras_corine_UK != 231] <- 0
 Ras_pasture[is.na(Ras_corine_UK)] <- NA
 
+library(rasterVis)
+
+levelplot(Ras_pasture) +
+  layer(sp.polygons(Shp_UK, lwd=0.1))
+
 # resample to ~10km grid squares. resample() function only calculates means — so with this coding
 # this represents fraction of new cell size under pasture. Multiply by area to get absolute area (in km2)
-Ras_pasture_ag <- resample(Ras_pasture, Ras_pH) * area(Ras_pH)
+Ras_pasture_ag <- resample(Ras_pasture, Ras_pH_UK) * area(Ras_pH_UK)
+
+hist(Ras_pasture_ag)
+plot(Ras_pasture_ag)
 
 # total area checks
 Ras_pasture_ag %>%
@@ -44,8 +36,5 @@ Ras_pasture_ag %>%
   pull(layer) %>%
   sum(na.rm = T)
 
-
 # write out created rasters for future use
-writeRaster(Ras_corine_UK, find_onedrive(dir = bigdata_repo, path = "Created rasters/Corine-land-cover-100m-UKonly-WGS84.tif"))
-writeRaster(Ras_pasture_ag, find_onedrive(dir = bigdata_repo, path = "Created rasters/UK-pasture-area-10km-CLC-based-WGS84.tif"))
-
+writeRaster(Ras_pasture_ag, find_onedrive(dir = bigdata_repo, path = "Created rasters/UK-pasture-area-10km-CLC-based-WGS84-2.tif"))

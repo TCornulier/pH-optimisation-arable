@@ -4,9 +4,6 @@ library(sp)
 
 bigdata_repo <- "GIS data repository"
 
-# read in pH raster as template
-Ras_pH <- find_onedrive(dir = bigdata_repo, path = "SoilGrids 5km/Soil pH/PHIHOX_M_sl4_5km_ll.tif") %>% raster()
-
 # soil data stack
 Soil <- stack(find_onedrive(dir = bigdata_repo, path = "SoilGrids 5km/Sand content/Fixed/SNDPPT_M_sl4_5km_ll.tif"),
               find_onedrive(dir = bigdata_repo, path = "SoilGrids 5km/Clay content/Fixed/CLYPPT_M_sl4_5km_ll.tif"),
@@ -27,8 +24,8 @@ rm(x, i , path)
 Shp_UK <- find_onedrive(dir = bigdata_repo, path = "DA shapefile/GBR_adm_shp/GBR_adm1.shp") %>% shapefile()
 
 # crop and mask to UK
-Soil_UK <- Soil %>% crop(Shp_UK) %>% mask(Shp_UK)
-Precip_UK <- Precip %>% crop(Shp_UK) %>% mask(Shp_UK)
+Soil_UK <- Soil %>% crop(Shp_UK)# %>% mask(Shp_UK)
+Precip_UK <- Precip %>% crop(Shp_UK)# %>% mask(Shp_UK)
 
 # resample precipitation to correct extent + resolution
 Precip_UK <- Precip_UK %>% resample(Soil_UK[[1]])
@@ -138,13 +135,12 @@ Pasture_yield <- rasterFromXYZ(Dat_main %>% select(x, y, Yield),
                                crs = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")
 plot(Pasture_yield)
 Pasture_yield
-# read in area raster and resample
+
+# read in area raster, extend, and mask
 Pasture_area <- find_onedrive(dir = bigdata_repo, path = "Created rasters/UK-pasture-area-10km-CLC-based-WGS84.tif") %>% raster()
 Pasture_area
 Pasture_yield <- extend(Pasture_yield, Pasture_area)
+Pasture_yield[is.na(Pasture_area)] <- NA
 
-Pasture_yield
-Pasture_area
-plot(Pasture_yield, add = T)
-stack(Pasture_yield, Pasture_area)
-plot(Pasture_area)
+writeRaster(Pasture_yield, find_onedrive(dir = bigdata_repo, path = "Created rasters/UK-pasture-yield-RB209-10km.tif"))
+
