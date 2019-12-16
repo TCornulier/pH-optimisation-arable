@@ -53,11 +53,9 @@ rm(Soil_stack, Crop_area_stack, Crop_yield_stack)
 
 # mask out to UK only
 Master_stack <- Master_stack %>% crop(UK) %>% mask(UK)
-plot(Master_stack[[1]])
-# plot(UK, add=T)
 
 # add in pasture area and yield data to master stack
-pasture_area <- find_onedrive(dir = "GIS data repository", path = "Created rasters/UK-pasture-area-10km-CLC-based-WGS84-2.tif") %>% raster()
+pasture_area <- find_onedrive(dir = "GIS data repository", path = "Created rasters/UK-pasture-area-10km-CLC-based-WGS84-lowland-workable.tif") %>% raster()
 pasture_yield <- find_onedrive(dir = "GIS data repository", path = "Created rasters/UK-pasture-yield-RB209-10km.tif") %>% raster()
 
 # resample
@@ -65,6 +63,7 @@ pasture_area <- pasture_area %>% resample(Master_stack)
 pasture_yield <- pasture_yield %>% resample(Master_stack)
 
 Master_stack <- stack(Master_stack, pasture_area, pasture_yield)
+rm(pasture_area, pasture_yield)
 
 # convert to dataframe
 Dat_main <- Master_stack %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
@@ -80,7 +79,7 @@ Dat_main <- Dat_main %>%
          Clay = CLYPPT_M_sl4_5km_ll,
          OC = OCSTHA_M_sd4_5km_ll,
          Cell_area_km2 = layer,
-         phys_area_pasture = UK.pasture.area.10km.CLC.based.WGS84.2,
+         phys_area_pasture = UK.pasture.area.10km.CLC.based.WGS84.lowland.workable,
          yield_pasture = UK.pasture.yield.RB209.10km) %>%
   mutate(pH = pH / 10) # for some reason it's * 10 in original raster
 
@@ -139,6 +138,7 @@ ggplot(Dat_cdf, aes(x = pH, y = Freq, colour = Crop)) +
   theme_classic()
 
 Dat_cdf_av <- Dat_cdf %>%
+  filter(Crop != "Pasture") %>%
   group_by(pH) %>%
   summarise(Area_ha = sum(Area_ha)) %>%
   arrange(pH) %>%
@@ -151,14 +151,7 @@ ggplot(Dat_cdf %>% filter(Crop != "Rest of crops")) + # we lose 913 ha of averag
   facet_wrap(~Crop, nrow = 4) +
   labs(x = "pH", y = "Frequency") +
   theme_classic()
-# ggsave("Output plots/pH CDFs, all crops.png", width = 8, height = 6)
-
-########
-
-# script tested + modified to include pasture up to this stage
-
-########
-
+ggsave(find_onedrive(dir = data_repo, path = "Output plots/pH CDFs, all crops.png"), width = 8, height = 6)
 
 # pH relationship with yield
 Dat_main %>%
@@ -209,16 +202,21 @@ DEFRA_LF <- tibble(Soil_type = TT.points.in.classes(tri.data = Dat_soil, class.s
                    Liming_factor_grass = c(6, 6, 6, 6, 5.5, 5.5, 5, 5, 5, 4, 4))
 # write_csv(DEFRA_LF, "Defra liming factors.csv")
 
-Liming_factor <- function(Soil_type){
+Liming_factor <- function(Soil_type, Land_use){
   Soil_type_search <- str_split(Soil_type, "\\W+") %>% unlist()
   LF_match <- DEFRA_LF[DEFRA_LF$Soil_type %in% Soil_type_search, ]
   LF_arable <- LF_match$Liming_factor_arable %>% mean()
-  return(LF_arable)
+  LF_grass <- LF_match$Liming_factor_grass %>% mean()
+  LF <- ifelse(Land_use == "Pasture", LF_grass, LF_arable)
+  return(LF)
 }
 
 Dat_main <- Dat_main %>%
-  mutate(LF = sapply(Soil_type, Liming_factor))
-Dat_main$Soil_type %>% table()
+  mutate(LF = map2_chr(Soil_type, Crop, Liming_factor))
+
+########
+# script updated to this point to include pasture
+########
 
 # match up yield response models to data
 Dat_yieldres <- bind_rows(read_csv("Holland et al. (2019) yield curves full data.csv"),
