@@ -13,7 +13,8 @@ Soil_stack <- stack(find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5k
                     find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Sand content/Fixed/SNDPPT_M_sl4_5km_ll.tif"), # sand %
                     find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Silt content/Fixed/SLTPPT_M_sl4_5km_ll.tif"), # silt %
                     find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Clay content/Fixed/CLYPPT_M_sl4_5km_ll.tif"), # clay %
-                    find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/OC tonnes per ha/Fixed/OCSTHA_M_sd4_5km_ll.tif")) # OC tonnes per ha
+                    find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/OC tonnes per ha/Fixed/OCSTHA_M_sd4_5km_ll.tif"), # OC tonnes per ha
+                    find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Bulk density/Fixed/BLDFIE_M_sl4_5km_ll.tif"))
 
 # read in crop area raster data and stack
 readdir <- find_onedrive(dir = data_repo, path = "GIS data/MapSPAM data/Physical area")
@@ -78,6 +79,7 @@ Dat_main <- Dat_main %>%
          Silt = SLTPPT_M_sl4_5km_ll,
          Clay = CLYPPT_M_sl4_5km_ll,
          OC = OCSTHA_M_sd4_5km_ll,
+         BD = BLDFIE_M_sl4_5km_ll,
          Cell_area_km2 = layer,
          phys_area_pasture = UK.pasture.area.10km.CLC.based.WGS84.lowland.workable,
          yield_pasture = UK.pasture.yield.RB209.10km) %>%
@@ -109,7 +111,7 @@ first_upper <- function(string){
 }
 
 Dat_main <- Dat_main %>%
-  gather(9:ncol(Dat_main), key = "key", value = "value") %>%
+  gather(10:ncol(Dat_main), key = "key", value = "value") %>%
   mutate(Crop = key %>% str_replace_all("(phys_area_)|(yield_)", "") %>%
            first_upper() %>%
            str_replace_all("_", " ") %>%
@@ -214,10 +216,6 @@ Liming_factor <- function(Soil_type, Land_use){
 Dat_main <- Dat_main %>%
   mutate(LF = map2_chr(Soil_type, Crop, Liming_factor))
 
-########
-# script updated to this point to include pasture
-########
-
 # match up yield response models to data
 Dat_yieldres <- bind_rows(read_csv("Holland et al. (2019) yield curves full data.csv"),
                           read_csv("Woodlands pH rotation model parameters.csv")) %>%
@@ -243,6 +241,9 @@ Dat_yieldres <- Dat_yieldres %>%
 
 Dat_yieldres <- Dat_yieldres %>%
   mutate(model_no = 1:nrow(Dat_yieldres))
+
+# yield response for pasture from Fornara et al. (2011)
+Dat_yieldres_pasture <- read_csv(find_onedrive(dir = data_repo, path = "Fornara yield response.csv"))
 
 # soil fractions, based on Holland paper for Rothamsted and Woburn, stated soil type/typical fractions for Woodlands — refine if possible
 Dat_soil <- tibble(site = c("Rothamsted", "Woburn", "Woodlands"),
@@ -280,21 +281,49 @@ rel_yield <- function(A, B, D, pH){
   return(rel_yield)
 }
 
-target_pH <- function(pH, OC){
-  is_peat <- (OC / 0.58) > 20 # assumes 20% threshold for peaty soil (as in RB209) and OM of 58% C
-  is_below <- pH < 6.7 # target pH for continuous arable should be 6.7
-  target_pH <- ifelse(is_peat == F & is_below == T, 6.7, pH)
+# function to calculate OM fraction based on C (t/ha) and BD (kg / m2)
+OM_frac <- function(BD_kg_m2, C_t_ha){
+  C_kg_m2 <- C_t_ha * 10^3 * 10^-4 * 1 / 0.3
+  Cfrac <- C_kg_m2 / BD_kg_m2
+  OMfrac <- Cfrac / 0.58 # assumes OM of 58% C
+  return(OMfrac)
+}
+
+target_pH <- function(Crop, pH, BD, OC){
+  
+  OM_frac <- OM_frac(BD, OC)
+  isnt_peat <- OM_frac < 0.2 # assumes 20% threshold for peaty soil (as in RB209)
+  
+  # define target with sequential logicals
+  target_pH <- pH # assume baseline is no change
+  target_pH <- ifelse(Crop == "Pasture" & isnt_peat & pH < 6.2, 6.2, target_pH) # 6 + 0.2 overshoot target for grass (RB209)
+  target_pH <- ifelse(Crop != "Pasture" & isnt_peat & pH < 6.7, 6.7, target_pH) # 6.5 + 0.2 overshoot target for crops (RB209)
+  
   return(target_pH)
 }
 
+# yield increases for croplands
 Dat_main <- Dat_main %>%
   mutate(Rel_yield = rel_yield(a_est, b_est, d_est, pH),
-         Target_pH = target_pH(pH, OC / 10),
+         Target_pH = target_pH(Crop, pH, BD, OC),
          Poss_yield = rel_yield(a_est, b_est, d_est, Target_pH),
          Yield_increase = Poss_yield / Rel_yield,
          pH_diff = Target_pH - pH) %>%
-  dplyr::select(-(a_est:d_est)) %>%
-  na.omit()
+  dplyr::select(-(a_est:d_est))
+
+# add in pasture cases
+Pas_yield_fac <- Dat_yieldres_pasture$mean[1] - 1
+
+Dat_main <- Dat_main %>%
+  mutate(Rel_yield = ifelse(Crop == "Pasture",
+                            1 / (1 + Pas_yield_fac * pH_diff),
+                            Rel_yield),
+         Poss_yield = ifelse(Crop == "Pasture",
+                             Rel_yield * (1 + Pas_yield_fac * pH_diff),
+                             Poss_yield),
+         Yield_increase = ifelse(Crop == "Pasture",
+                                 Poss_yield / Rel_yield,
+                                 Yield_increase))
 
 qplot(Dat_main$Yield_increase)
 
@@ -304,6 +333,17 @@ source("SOC RC function v2.R")
 
 Dat_main <- Dat_main %>%
   mutate(SOCchange_frac = SOC_RC(ipH = pH, fpH = Target_pH))
+
+# add in pasture cases
+# C sequestration dataset using data from Fornara et al. (2011)
+
+# values used in previous analayis are absolute — we need relative change / time
+# this data is present in the Fornara paper but requires graphical extraction...!
+
+##########
+# pasture integrated to this stage
+##########
+
 
 # EI for different crops in g CO2-eq per kg, data from Feedprint for on-farm production only
 # 'cereals, other' classed as oats, 'oil crops. other' classed as linseed, 'pulses, other' classed as beans
