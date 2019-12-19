@@ -3,13 +3,15 @@ library(tidyverse)
 library(sp)
 
 bigdata_repo <- "GIS data repository"
+projdata_repo <- "DEFRA Clean Growth Project/pH Optimisation/Extension for publication"
 
 # soil data stack
 Soil <- stack(find_onedrive(dir = bigdata_repo, path = "SoilGrids 5km/Sand content/Fixed/SNDPPT_M_sl4_5km_ll.tif"),
               find_onedrive(dir = bigdata_repo, path = "SoilGrids 5km/Clay content/Fixed/CLYPPT_M_sl4_5km_ll.tif"),
               find_onedrive(dir = bigdata_repo, path = "SoilGrids 5km/Depth to bedrock/Fixed/BDRICM_M_5km_ll.tif"),
               find_onedrive(dir = bigdata_repo, path = "SoilGrids 5km/OC tonnes per ha/Fixed/OCSTHA_M_30cm_5km_ll.tif"),
-              find_onedrive(dir = bigdata_repo, path = "SoilGrids 5km/Bulk density/Fixed/BLDFIE_M_sl4_5km_ll.tif"))
+              find_onedrive(dir = bigdata_repo, path = "SoilGrids 5km/Bulk density/Fixed/BLDFIE_M_sl4_5km_ll.tif"),
+              find_onedrive(dir = bigdata_repo, path = "soilGrids 5km/Soil pH/Fixed/PHIHOX_M_sl4_5km_ll.tif"))
 
 # precipitation stack
 Precip <- raster::stack()
@@ -43,10 +45,12 @@ Dat_main <- Dat_main %>%
          Clay = CLYPPT_M_sl4_5km_ll,
          Bedrock = BDRICM_M_5km_ll,
          OC = OCSTHA_M_30cm_5km_ll,
-         BD = BLDFIE_M_sl4_5km_ll) %>%
+         BD = BLDFIE_M_sl4_5km_ll,
+         pH = PHIHOX_M_sl4_5km_ll) %>%
   select(-(wc2.0_30s_prec_04:wc2.0_30s_prec_09)) %>%
   mutate(Precip_mm = rowSums(precip_temp),
-         Silt = 100 - (Sand + Clay))
+         Silt = 100 - (Sand + Clay),
+         pH = pH / 10)
 rm(precip_temp)
 
 # assign soil type based on texture data (details here https://cran.r-project.org/web/packages/soiltexture/vignettes/soiltexture_vignette.pdf)
@@ -130,6 +134,19 @@ Pas_yield <- function(GGC){
 Dat_main <- Dat_main %>%
   mutate(Yield = map_dbl(GGC, Pas_yield))
 
+# adjust pasture yield predictions for pH
+Dat_yieldres_pasture <- read_csv(find_onedrive(dir = projdata_repo, path = "Fornara yield response.csv"))
+
+Yield_adjust_fac <- function(pH){
+  pH_gap <- ifelse(pH < 6, 6 - pH, 0)
+  Yield_effect <- Dat_yieldres_pasture$mean[1] - 1
+  Yield_adjust_fac <- 1 / (1 + Yield_effect * pH_gap)
+  return(Yield_adjust_fac)
+}
+
+Dat_main <- Dat_main %>%
+  mutate(Yield = Yield * Yield_adjust_fac(pH))
+
 # write to raster
 Pasture_yield <- rasterFromXYZ(Dat_main %>% select(x, y, Yield),
                                crs = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")
@@ -142,5 +159,5 @@ Pasture_area
 Pasture_yield <- extend(Pasture_yield, Pasture_area)
 Pasture_yield[is.na(Pasture_area)] <- NA
 
-writeRaster(Pasture_yield, find_onedrive(dir = bigdata_repo, path = "Created rasters/UK-pasture-yield-RB209-10km.tif"))
+writeRaster(Pasture_yield, find_onedrive(dir = bigdata_repo, path = "Created rasters/UK-pasture-yield-RB209-10km.tif"), overwrite = T)
 
