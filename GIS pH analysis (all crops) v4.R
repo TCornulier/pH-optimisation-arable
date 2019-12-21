@@ -214,7 +214,7 @@ Liming_factor <- function(Soil_type, Land_use){
 }
 
 Dat_main <- Dat_main %>%
-  mutate(LF = map2_chr(Soil_type, Crop, Liming_factor))
+  mutate(LF = map2_dbl(Soil_type, Crop, Liming_factor))
 
 # match up yield response models to data
 Dat_yieldres <- bind_rows(read_csv("Holland et al. (2019) yield curves full data.csv"),
@@ -289,6 +289,7 @@ OM_frac <- function(BD_kg_m2, C_t_ha){
   return(OMfrac)
 }
 
+# function to infer target pH
 target_pH <- function(Crop, pH, BD, OC){
   
   OM_frac <- OM_frac(BD, OC)
@@ -296,8 +297,8 @@ target_pH <- function(Crop, pH, BD, OC){
   
   # define target with sequential logicals
   target_pH <- pH # assume baseline is no change
-  target_pH <- ifelse(Crop == "Pasture" & isnt_peat & pH < 6.2, 6.2, target_pH) # 6 + 0.2 overshoot target for grass (RB209)
-  target_pH <- ifelse(Crop != "Pasture" & isnt_peat & pH < 6.7, 6.7, target_pH) # 6.5 + 0.2 overshoot target for crops (RB209)
+  target_pH <- ifelse(Crop == "Pasture" & isnt_peat & pH < 6.0, 6.0, target_pH) # 6 target for grass (RB209)
+  target_pH <- ifelse(Crop != "Pasture" & isnt_peat & pH < 6.5, 6.5, target_pH) # 6.5 target for crops (RB209)
   
   return(target_pH)
 }
@@ -334,22 +335,22 @@ source("SOC RC function v2.R")
 Dat_main <- Dat_main %>%
   mutate(SOCchange_frac = SOC_RC(ipH = pH, fpH = Target_pH))
 
-# add in pasture cases
-# C sequestration dataset using data from Fornara et al. (2011)
+# add in pasture cases - C sequestration predictions using data from Fornara et al. (2011)
 
-# values used in previous analayis are absolute — we need relative change / time
-# this data is present in the Fornara paper but requires graphical extraction...!
+Dat_main <- Dat_main %>%
+  mutate(SOCchange_frac = ifelse(Crop == "Pasture", 1 + C_response_fac_grass * pH_diff * 20, SOCchange_frac))
 
-##########
-# pasture integrated to this stage
-##########
-
+# we avoided dropping crops without matched models earlier to allow us to add in pasture using a different approach;
+# now we need to drop those crops which still have no data for yield etc.
+Dat_main <- Dat_main %>%
+  drop_na(Yield_increase)
 
 # EI for different crops in g CO2-eq per kg, data from Feedprint for on-farm production only
 # 'cereals, other' classed as oats, 'oil crops. other' classed as linseed, 'pulses, other' classed as beans
 # EI for vegetables based on root crops/onions/cabbages figure from Wallen et al. (2004) (Feedprint doesn't do vegetable EFs)
+# EI for pasture based on feedprint EI for grass silage
 Dat_EI <- tibble(Crop = Dat_main %>% pull(Crop) %>% unique(),
-                 EI = c(343, 465, 1222, 226, 766, 984, 500, 349))
+                 EI = c(343, 465, 1222, 226, 766, 984, 500, 349, 235))
 
 Dat_main <- Dat_main %>%
   left_join(Dat_EI, by = "Crop")
@@ -368,7 +369,7 @@ Dat_main <- Dat_main %>%
 
 # calculate emissions from lime application and mitigation balance
 Dat_main <- Dat_main %>%
-  mutate(Limerate = (LF * (Target_pH + 0.2 - pH)) / 5, # Assuming a 5 year interval between applications (based on a variety of data sources)
+  mutate(Limerate = (LF * (pH_diff + 0.2)) / 5, # Assuming a 5 year interval between applications (based on a variety of data sources) + 0.2 pH unit overshoot as recommended in RB209
          Limeemb_GHG = 0.074 * Limerate, # Kool et al. (2012)
          Limedir_GHG = 0.125 * 44/12 * Limerate, # IPCC (2006)
          Dies_GHG = (336 * 0.7) / 36.9 * 3.165 * 10^-3, # Williams et al (2006) for diesel usage * DEFRA/DECC for EF
@@ -378,12 +379,13 @@ Dat_main <- Dat_main %>%
          GHG_balance = Tot_GHG - Tot_GHGmit)
 
 # sale values for different crops from FMH 17/18, all in 2017 GBP
+# for grass, estimate is mean production cost from FMH 17/18
 # linseed uses OSR values, potatoes assumes dual purpose and price is weighted according to relative yields
 # vegetables takes data for potatoes — very similar to most veg prices
 Dat_saleval <- tibble(Crop = Dat_main %>% pull(Crop) %>% unique(),
-                      Maincrop_saleval = c(145, 155, 325, 113, 200, 325, 113, 165),
-                      Bycrop_saleval = c(55, 50, 0, 0, 0, 0, 0, 50), # secondary crop e.g. straw
-                      Bycrop_ratio = c(0.55, 0.60, 0, 0, 0, 0, 0, 0.53)) # ratio of secondary crop to main crop yield
+                      Maincrop_saleval = c(145, 155, 325, 113, 200, 325, 113, 165, 22.5),
+                      Bycrop_saleval = c(55, 50, 0, 0, 0, 0, 0, 50, 0), # secondary crop e.g. straw
+                      Bycrop_ratio = c(0.55, 0.60, 0, 0, 0, 0, 0, 0.53, 0)) # ratio of secondary crop to main crop yield
 
 # join sale values to main data
 Dat_main <- Dat_main %>% left_join(Dat_saleval, by = "Crop")
