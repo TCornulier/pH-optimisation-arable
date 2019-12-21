@@ -54,17 +54,17 @@ Tu_dat <- tibble(pH = c(rnorm(n = sim_n, mean = 6.46, sd = 0.59),
                          rnorm(n = sim_n, mean = 25.78, sd = 1.96),
                          rnorm(n = sim_n, mean = 27.95, sd = 3.26)))
 
-ggplot(Wob_dat, aes(x = pH, y = SOC)) +
-  geom_point(colour = "darkred", alpha = 0.5) +
-  geom_smooth(method = "loess", span = 0.9)
+#ggplot(Wob_dat, aes(x = pH, y = SOC)) +
+#  geom_point(colour = "darkred", alpha = 0.5) +
+#  geom_smooth(method = "loess", span = 0.9)
 
-ggplot(Roth_dat, aes(x = pH, y = SOC)) +
-  geom_point(colour = "darkred", alpha = 0.5) +
-  geom_smooth(method = "loess", span = 0.9)
+#ggplot(Roth_dat, aes(x = pH, y = SOC)) +
+#  geom_point(colour = "darkred", alpha = 0.5) +
+#  geom_smooth(method = "loess", span = 0.9)
 
-ggplot(Tu_dat, aes(x = pH, y = SOC)) +
-  geom_point(colour = "darkred", alpha = 0.5) +
-  geom_smooth(method = "loess", span = 0.9)
+#ggplot(Tu_dat, aes(x = pH, y = SOC)) +
+#  geom_point(colour = "darkred", alpha = 0.5) +
+#  geom_smooth(method = "loess", span = 0.9)
 
 SOC_dat <- bind_rows(list(Rothamsted = Roth_dat, Woburn = Wob_dat, Tu = Tu_dat), .id = "Experiment")
 
@@ -87,34 +87,29 @@ SOC_dat <- SOC_dat %>%
 
 mean(SOC_dat$SOC_std2)
 
-ggplot(SOC_dat) +
-  geom_point(aes(x = pH_std2, y = SOC_std2, colour = Experiment), alpha = 0.1) +
-  geom_smooth(aes(x = pH_std2, y = SOC_std2, colour = Experiment), method = "loess", span = 1, lty = 2, size = 0.5, colour = "black", se = T) +
-  scale_x_continuous(breaks = 3:8) +
-  xlim(c(3, 8)) +
-  #ylim(c(0, 30)) +
-  labs(x = "pH, standardised",
-       y = expression("SOC stocks (g kg"^{-1}*"), standardised")) +
-  theme_classic()
+#ggplot(SOC_dat) +
+#  geom_point(aes(x = pH_std2, y = SOC_std2, colour = Experiment), alpha = 0.1) +
+#  geom_smooth(aes(x = pH_std2, y = SOC_std2, colour = Experiment), method = "loess", span = 1, lty = 2, size = 0.5, colour = "black", se = T) +
+#  scale_x_continuous(breaks = 3:8) +
+#  xlim(c(3, 8)) +
+#  #ylim(c(0, 30)) +
+#  labs(x = "pH, standardised",
+#       y = expression("SOC stocks (g kg"^{-1}*"), standardised")) +
+#  theme_classic()
 #ggsave(find_onedrive(dir = data_repo, path = "Output plots/SOC model plot.png"), width = 8, height = 5)
 
-ggplot(SOC_dat %>% filter(Experiment != "Tu")) +
-  geom_point(aes(x = pH_std2, y = SOC_std2, colour = Experiment), alpha = 0.1) +
-  geom_smooth(aes(x = pH_std2, y = SOC_std2, colour = Experiment), method = "loess", span = 1, lty = 2, size = 0.5, colour = "black", se = T) +
-  scale_x_continuous(breaks = 3:8) +
-  xlim(c(3, 8)) +
-  ylim(c(0, 30)) +
-  labs(x = "pH, standardised",
-       y = expression("SOC stocks (g kg"^{-1}*"), standardised")) +
-  theme_classic()
+#ggplot(SOC_dat %>% filter(Experiment != "Tu")) +
+#  geom_point(aes(x = pH_std2, y = SOC_std2, colour = Experiment), alpha = 0.1) +
+#  geom_smooth(aes(x = pH_std2, y = SOC_std2, colour = Experiment), method = "loess", span = 1, lty = 2, size = 0.5, colour = "black", se = T) +
+#  scale_x_continuous(breaks = 3:8) +
+#  xlim(c(3, 8)) +
+#  ylim(c(0, 30)) +
+#  labs(x = "pH, standardised",
+#       y = expression("SOC stocks (g kg"^{-1}*"), standardised")) +
+#  theme_classic()
 #ggsave(find_onedrive(dir = data_repo, "Output plots/SOC model plot.png"), width = 8, height = 4)
 
 SOC_RC_model <- loess(SOC_std2 ~ pH_std2, data = SOC_dat %>% filter(Experiment != "Tu"), span = 1)
-
-# temp <- tibble(pH = seq(from = 3.5, to = 7.5, length.out = 100),
-#                SOC = predict(SOC_RC_model, newdata = pH))
-# qplot(temp$pH, temp$SOC)
-# rm(temp)
 
 SOC_RC <- function(ipH, fpH){
   iSOC <- predict(SOC_RC_model, newdata = ipH)
@@ -122,4 +117,36 @@ SOC_RC <- function(ipH, fpH){
   cSOC <- fSOC / iSOC
   return(cSOC)
 }
-               
+
+# added to include a SOC response for grass
+Grass_pH <- read_csv(find_onedrive(dir = data_repo, path = "Fornara final pH data.csv"))
+Dat_grass <- read_csv(find_onedrive(dir = data_repo, path = "Fornara soil C data raw.csv"))
+
+#Dat_grass %>%
+#  gather(-year, key = type, value = soil_C) %>%
+#  ggplot(aes(x = year, y = soil_C, colour = type, group = type)) +
+#  geom_line() +
+#  geom_smooth(method = "lm", se = F)
+
+# linear models for both
+treat_model <- lm(treatment ~ year, data = Dat_grass)
+cont_model <- lm(control ~ year, data = Dat_grass)
+
+summary(treat_model) # p < .05
+summary(cont_model) # ns, which is good — variation comes from other factors
+
+# subtract slopes to control for (ns but slight) difference in starting stocks and determine annual response
+# divide by mean starting stocks to give fractional response
+# divide by pH difference to give fractional C response per unit pH change
+C_response_fac_grass <- (as.numeric(treat_model$coefficients[2] - cont_model$coefficients[2]) / mean(c(Dat_grass$control[1], Dat_grass$treatment[1]))) / (Grass_pH$pH[2] - Grass_pH$pH[1])
+
+# tidy up
+rm(cont_model,
+   Dat_grass,
+   Grass_pH,
+   Roth_dat,
+   SOC_dat,
+   treat_model,
+   Tu_dat,
+   Wob_dat,
+   sim_n)
