@@ -80,7 +80,7 @@ Dat_main %>%
   ggplot() +
   geom_raster(aes(x = x, y = y, fill = Area_pc)) +
   facet_wrap(~Area_type, nrow = 1) +
-  geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
+  geom_polygon(data = Shp_UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
   xlim(c(-10, 5)) +
   ylim(c(49, 62)) +
   scale_fill_gradient(low = "lightgrey", high = "darkgreen") +
