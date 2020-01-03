@@ -1,9 +1,13 @@
 # script to create plots and outputs for manuscript from script [GIS pH analysis (all crops) v4.R]
 #setwd("~/Documents/SRUC/DEFRA Clean Growth Project/pH Optimisation/Extension for publication/Output plots")
+library(RColorBrewer)
 
 data_repo <- "DEFRA Clean Growth Project/pH Optimisation/Extension for publication"
 
+##########################
 # abatement map for UK
+##########################
+
 Dat_summ1 <- Dat_main %>%
   group_by(x, y) %>%
   summarise(Abatement = sum(Abatement)) %>%
@@ -42,7 +46,11 @@ ggplot() +
   theme_void()
 # ggsave("Output plots/Abatement map UK discrete.png", width = 8, height = 7)
 
+
+##########################
 # abatement map per hectare for UK
+##########################
+
 Dat_main %>%
   group_by(x, y) %>%
   summarise(Abatement = sum(Abatement),
@@ -57,7 +65,10 @@ Dat_main %>%
   theme_void()
 #ggsave("Output plots/Abatement map UK per ha.png", width = 8, height = 7)
 
+##########################
 # MAC map for UK
+##########################
+
 Dat_summ2 <- Dat_main %>%
   filter(GHG_balance <= -0.1) %>% # only measures with reliable mitigation (i.e. < 100 kg CO2-eq / ha / year) included
   group_by(x, y) %>%
@@ -80,29 +91,37 @@ ggplot() +
   theme_void()
 # ggsave("Output plots/MAC map UK.png", width = 8, height = 7)
 
+##########################
 # crop map for UK
-Dat_summ3 <- Dat_main %>%
+##########################
+
+# first make named list for crop categories
+Crop_colours <- brewer.pal(9, "Pastel1") # can change up if desired
+names(Crop_colours) <- c("Oil crops, other", "Potato", "Pasture", "Vegetable", "Rapeseed",
+                         "Wheat", "Barley", "Pulses, other", "Cereals, other")
+
+Dat_main %>%
+  filter(Crop != "Pasture") %>% # too dominant!
   group_by(x, y) %>%
   mutate(Dom_crop = Area_ha == max(Area_ha)) %>%
   filter(Dom_crop == T) %>%
   dplyr::select(x, y, Crop) %>%
-  ungroup()
-
-# cheeky hack to stop non-dominant crops getting dropped altogether — now the colour palette matches the MACCs!
-Dat_summ3 <- Dat_summ3 %>%
-  add_row(Crop = "Oil crops, other") %>%
-  add_row(Crop = "Vegetable")
-
-qplot(Dat_summ3$Crop)
-ggplot() +
-  geom_raster(data = Dat_summ3, aes(x = x, y = y, fill = Crop), alpha = 0.7) +
+  ungroup() %>%
+  #add_row(Crop = "Oil crops, other") %>% # cheeky hack to stop non-dominant crops getting dropped altogether
+  #add_row(Crop = "Vegetable") %>%
+  ggplot() +
+  geom_raster(aes(x = x, y = y, fill = Crop)) +
   geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
-  scale_fill_brewer(type = "qual", palette = "Set3") +
+  scale_fill_manual(values = Crop_colours) +
+  labs(fill = "") +
   coord_quickmap() +
   theme_void()
-# ggsave("Output plots/Dominant arable crop map UK.png", width = 8, height = 7)
+ggsave("Output plots/Dominant arable crop map UK.png", width = 8, height = 7)
 
+##########################
 # pH map of UK
+##########################
+
 ggplot() +
   geom_raster(data = Dat_main, aes(x = x, y = y, fill = pH), alpha = 0.7) +
   geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
@@ -111,15 +130,20 @@ ggplot() +
   theme_void()
 #ggsave(find_onedrive(dir = data_repo, path = "Output plots/UK pH map.png"), width = 8, height = 7)
 
+##########################
 # how much land area is lost by removing unmatched crops?
+##########################
+
 Dat_cdf %>%
   filter(Crop %in% Dat_main$Crop == F) %>%
   group_by(Crop) %>%
   summarise(Area_kha = sum(Area_ha) * 10^-3)
 
+##########################
 # UK full MACC
+##########################
 Dat_main %>%
-  filter(GHG_balance <= -0.1) %>% # only measures with reliable mitigation (i.e. < 100 kg CO2-eq / ha / year) included
+  filter(GHG_balance <= -0.1) %>% # only cells with reliable mitigation (i.e. < 100 kg CO2-eq / ha / year) included
   dplyr::select(MAC, Abatement, Crop) %>%
   filter(MAC >= quantile(MAC, 0.05),
          MAC <= quantile(MAC, 0.95)) %>%
@@ -131,14 +155,18 @@ Dat_main %>%
          ymax = ifelse(MAC > 0, MAC, 0),
          xav = (xmin + xmax) / 2) %>%
   ggplot() +
-  geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = Crop), colour = NA, alpha = 0.9) +
-  scale_fill_brewer(type="qual", palette="Set3", guide=guide_legend(title = NULL)) +
+  geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = Crop), colour = NA) +
+  geom_hline(yintercept = 66.1, size = 0.1, colour = "black", lty = 2) +
+  scale_fill_manual(values = Crop_colours) +
   labs(x = expression('Abatement potential (kt CO'[2]*'eq year'^{-1}*')'),
-       y = expression('Marginal abatement cost (GBP tonne CO'[2]*'-eq'^{-1}*')')) +
+       y = expression('Marginal abatement cost (GBP tonne CO'[2]*'-eq'^{-1}*')'),
+       fill = "") +
   theme_classic()
 # ggsave("Output plots/UK full MACC.png", width = 8, height = 5)
 
+###############################
 # devolved administration MACCs
+###############################
 Dat_main %>%
   filter(GHG_balance <= -0.1) %>% # only measures with reliable mitigation (i.e. < 100 kg CO2-eq / ha / year) included
   dplyr::select(MAC, Abatement, Crop, DA) %>%
@@ -153,15 +181,19 @@ Dat_main %>%
          ymax = ifelse(MAC > 0, MAC, 0),
          xav = (xmin + xmax) / 2) %>%
   ggplot() +
-  geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = Crop), colour = NA, alpha = 0.9) +
-  scale_fill_brewer(type="qual", palette="Set3", guide=guide_legend(title = NULL)) +
+  geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = Crop), colour = NA) +
+  geom_hline(yintercept = 66.1, size = 0.1, colour = "black", lty = 2) +
+  scale_fill_manual(values = Crop_colours) +
   labs(x = expression('Abatement potential (kt CO'[2]*'eq year'^{-1}*')'),
-       y = expression('Marginal abatement cost (GBP tonne CO'[2]*'-eq'^{-1}*')')) +
+       y = expression('Marginal abatement cost (GBP tonne CO'[2]*'-eq'^{-1}*')'),
+       fill = "") +
   facet_wrap(~DA, nrow = 2) +
   theme_classic()
 # ggsave("Output plots/DA MACCs.png", width = 8, height = 5)
 
+############################
 # table 1 (defra liming factors)
+############################
 DEFRA_LF %>%
   gather(-Soil_type, key = `Land use`, value = `Liming factor`) %>%
   spread(key = Soil_type, value = `Liming factor`) %>%
@@ -184,17 +216,21 @@ tibble(abbrev = DEFRA_LF$Soil_type) %>%
   pull(full2) %>%
   str_c(collapse = "; ")
 
+############################
 # yield increase boxplot
+############################
 Dat_main %>% ggplot(aes(x = Crop, y = Yield_increase, fill = DA)) +
   geom_boxplot(outlier.shape = NA) +
   scale_fill_brewer(palette = "Set3") +
   ylim(c(1, 1.8)) +
-  labs(x = "", y = "Limed yield as fraction of non-limed yield", fill = "") +
+  labs(x = "", y = "Limed yield (relative)", fill = "") +
   coord_flip() +
   theme_classic()
 # ggsave("Output plots/Fractional yield increase.png", width = 8, height = 4)
 
+############################
 # yield increase columns
+############################
 order <- Dat_main %>%
   filter(GHG_balance <= -0.1) %>%
   group_by(Crop) %>%
@@ -217,15 +253,6 @@ Dat_main %>%
   coord_flip() +
   theme_classic()
 # ggsave("Output plots/Additional crop production.png", width = 8, height = 3)
-
-# temp, diagnostic
-Dat_main %>%
-  filter(GHG_balance <= -0.1) %>%
-  mutate(Yield_inc_ktha = Yield_tha * (Yield_increase - 1) * 10^-3) %>%
-  left_join(Dat_yieldres %>% select(model_no, site), by = "model_no") %>%
-  ggplot(aes(x = Crop, y = Yield_inc_ktha, fill = site)) +
-  geom_boxplot() +
-  coord_flip()
 
 # table 2
 write_csv(Dat_saleval %>% dplyr::select(-Bycrop_ratio), "Output plots/Table 2.csv")
@@ -274,6 +301,8 @@ yield_inc_ab <- Dat_main %>%
   pull(Yield_inc_kt) %>%
   sum()
 yield_inc_ab / d2
+
+
 #####################
 # emissions + abatement
 ####################
