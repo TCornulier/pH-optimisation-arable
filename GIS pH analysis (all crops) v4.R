@@ -233,7 +233,7 @@ Dat_yieldres <- Dat_yieldres %>%
   group_by(crop, site) %>%
   summarise_at(vars(a_est:d_est), funs(mean(.))) %>%
   ungroup() %>%
-  mutate(data_cropmatch = c("Barley", NA, "Oil crops, other", "Oil crops, other", "Cereals, other",
+  mutate(data_cropmatch = c("Barley", "Pasture", "Oil crops, other", "Oil crops, other", "Cereals, other",
                             "Potato", "Potato", "Potato", "Barley", "Barley",
                             "Pulses, other", "Pulses, other", NA, NA, "Cereals, other",
                             "Cereals, other", "Vegetable", "Wheat", "Rapeseed", "Rapeseed",
@@ -243,13 +243,14 @@ Dat_yieldres <- Dat_yieldres %>%
   mutate(model_no = 1:nrow(Dat_yieldres))
 
 # yield response for pasture from Fornara et al. (2011)
-Dat_yieldres_pasture <- read_csv(find_onedrive(dir = data_repo, path = "Fornara yield response.csv"))
+# superceded by Woodlands Field pasture model (produces similar results regardless)
+# Dat_yieldres_pasture <- read_csv(find_onedrive(dir = data_repo, path = "Fornara yield response.csv"))
 
 # soil fractions, based on Holland paper for Rothamsted and Woburn, stated soil type/typical fractions for Woodlands — refine if possible
 Dat_soil <- tibble(site = c("Rothamsted", "Woburn", "Woodlands"),
-                   sand = c(28, 71, 60),
-                   silt = c(52, 17, 30),
-                   clay = c(20, 12, 10))
+                   sand = c(28, 71, 63),
+                   silt = c(52, 17, 25),
+                   clay = c(20, 12, 12))
 
 # function to select most appropriate yield response model for crop and soil type
 # selects most similar soil type for which model is available
@@ -313,20 +314,21 @@ Dat_main <- Dat_main %>%
   dplyr::select(-(a_est:d_est))
 
 # add in pasture cases
-Pas_yield_fac <- Dat_yieldres_pasture$mean[1] - 1
+# superceded by Woodlands Field grass model
+#Pas_yield_fac <- Dat_yieldres_pasture$mean[1] - 1
+#
+#Dat_main <- Dat_main %>%
+#  mutate(Rel_yield = ifelse(Crop == "Pasture",
+#                            1 / (1 + Pas_yield_fac * pH_diff),
+#                            Rel_yield),
+#         Poss_yield = ifelse(Crop == "Pasture",
+#                             Rel_yield * (1 + Pas_yield_fac * pH_diff),
+#                             Poss_yield),
+#         Yield_increase = ifelse(Crop == "Pasture",
+#                                 Poss_yield / Rel_yield,
+#                                 Yield_increase))
 
-Dat_main <- Dat_main %>%
-  mutate(Rel_yield = ifelse(Crop == "Pasture",
-                            1 / (1 + Pas_yield_fac * pH_diff),
-                            Rel_yield),
-         Poss_yield = ifelse(Crop == "Pasture",
-                             Rel_yield * (1 + Pas_yield_fac * pH_diff),
-                             Poss_yield),
-         Yield_increase = ifelse(Crop == "Pasture",
-                                 Poss_yield / Rel_yield,
-                                 Yield_increase))
-
-qplot(Dat_main$Yield_increase)
+qplot(Dat_main$Yield_increase, Dat_main$Crop)
 
 # load SOC response curve function derived in separate script and apply to main data
 # function output is fractional
