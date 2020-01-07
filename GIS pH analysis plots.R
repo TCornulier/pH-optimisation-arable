@@ -252,7 +252,7 @@ Dat_main %>%
   scale_fill_brewer(palette = "Blues") +
   coord_flip() +
   theme_classic()
-# ggsave("Output plots/Additional crop production.png", width = 8, height = 3)
+# ggsave(find_onedrive(dir = data_repo, path = "Output plots/Additional crop production.png"), width = 8, height = 3)
 
 # table 2
 write_csv(Dat_saleval %>% dplyr::select(-Bycrop_ratio), "Output plots/Table 2.csv")
@@ -265,16 +265,21 @@ write_csv(Dat_saleval %>% dplyr::select(-Bycrop_ratio), "Output plots/Table 2.cs
 # area stats
 #############
 
-# total area (kha)
-d1 <- Dat_main %>% pull(Area_ha) %>% sum() * 10^-3
-print(d1)
+# total area arable (kha)
+d1a <- Dat_main %>% filter(Crop != "Pasture") %>% pull(Area_ha) %>% sum() * 10^-3
+d1a
+
+# total area grass (kha)
+d1b <- Dat_main %>% filter(Crop == "Pasture") %>% pull(Area_ha) %>% sum() * 10^-3
+d1b
 
 # area with abatement (kha)
-d2 <- Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Area_ha) %>% sum() * 10^-3 
-print(d2)
+d2a <- Dat_main %>% filter(Crop != "Pasture", GHG_balance <= -0.1) %>% pull(Area_ha) %>% sum() * 10^-3 
+d2b <- Dat_main %>% filter(Crop == "Pasture", GHG_balance <= -0.1) %>% pull(Area_ha) %>% sum() * 10^-3 
 
 # fractional area with abatement
-d2 / d1 # area with abatement
+d2a / d1a # arable area with abatement
+d2b / d1b # grass area with abatement
 
 # average 5-year lime rate
 Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Limerate) %>% mean() * 5
@@ -282,26 +287,45 @@ Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Limerate) %>% mean() * 5
 # abatement in kt
 Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Abatement) %>% sum() * 10^-3
 
-# overall yield increase in kt
+# overall yield increase in kt (arable)
 yield_inc <- Dat_main %>%
+  filter(Crop != "Pasture") %>%
   mutate(Yield_inc_ktha = Yield_tha * (Yield_increase - 1) * 10^-3,
          Yield_inc_kt = Yield_inc_ktha * Area_ha) %>%
   pull(Yield_inc_kt) %>%
   sum()
 
-yield_inc / d1
+yield_inc / d1a
+
+yield_inc_grass <- Dat_main %>%
+  filter(Crop == "Pasture") %>%
+  mutate(Yield_inc_ktha = Yield_tha * (Yield_increase - 1) * 10^-3,
+         Yield_inc_kt = Yield_inc_ktha * Area_ha) %>%
+  pull(Yield_inc_kt) %>%
+  sum()
+yield_inc_grass / d1b
+
 # equal to about 362 kg / ha over ENTIRE area
 
 
 # yield increase in kt only in areas where net abatement is possible
 yield_inc_ab <- Dat_main %>%
-  filter(GHG_balance <= -0.1) %>%
+  filter(Crop != "Pasture",
+         GHG_balance <= -0.1) %>%
   mutate(Yield_inc_ktha = Yield_tha * (Yield_increase - 1) * 10^-3,
          Yield_inc_kt = Yield_inc_ktha * Area_ha) %>%
   pull(Yield_inc_kt) %>%
   sum()
-yield_inc_ab / d2
+yield_inc_ab / d2a
 
+yield_inc_ab_grass <- Dat_main %>%
+  filter(Crop == "Pasture",
+         GHG_balance <= -0.1) %>%
+  mutate(Yield_inc_ktha = Yield_tha * (Yield_increase - 1) * 10^-3,
+         Yield_inc_kt = Yield_inc_ktha * Area_ha) %>%
+  pull(Yield_inc_kt) %>%
+  sum()
+yield_inc_ab / d2b
 
 #####################
 # emissions + abatement
