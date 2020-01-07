@@ -328,8 +328,6 @@ Dat_main <- Dat_main %>%
 #                                 Poss_yield / Rel_yield,
 #                                 Yield_increase))
 
-qplot(Dat_main$Yield_increase, Dat_main$Crop)
-
 # load SOC response curve function derived in separate script and apply to main data
 # function output is fractional
 source("SOC RC function v2.R")
