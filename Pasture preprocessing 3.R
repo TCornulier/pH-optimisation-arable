@@ -65,12 +65,12 @@ writeRaster(Pasture_workable_lowland, find_onedrive(dir = bigdata_repo, path = "
 Dat_main <- stack(Pasture_area, Pasture_workable_lowland, area(Pasture_area)) %>%
   mask(Shp_UK) %>%
   as.data.frame(xy = T) %>%
-  as_tibble()
+  as_tibble() %>%
+  drop_na()
 
 colnames(Dat_main) <- c("x", "y", "Total_pasture_area", "Workable_lowland_pasture_area", "Cell_area")
 
 Dat_main %>%
-  drop_na() %>%
   mutate_at(vars(Total_pasture_area:Workable_lowland_pasture_area), funs(. / Cell_area * 100)) %>%
   select(-Cell_area) %>%
   gather(-x, -y, key = "Area_type", value = "Area_pc") %>%
@@ -88,3 +88,12 @@ Dat_main %>%
   coord_quickmap() +
   theme_void()
 ggsave(find_onedrive(dir = output_repo, path = "Pasture area comparison map.png"), width = 8, height = 7)
+
+# descriptives for paper
+d1 <- Dat_main %>% pull(Total_pasture_area) %>% sum() * 10^2 * 10^-3 # total area, in '000 ha
+d1
+d2 <- Dat_main %>% pull(Workable_lowland_pasture_area) %>% sum() * 10^2 * 10^-3 # workable area, in '000 ha
+d2
+d2 /d1 # fraction workable
+
+
