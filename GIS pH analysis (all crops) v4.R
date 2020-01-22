@@ -427,4 +427,37 @@ DA_dat <- bind_rows(list(England = Eng_df, `Northern Ireland` = NI_df, Scotland 
 
 Dat_main <- left_join(Dat_main, DA_dat, by = c("x", "y"))
 
+# added 21/01/2020 to include N2O predictions using the Hillier/Cornulier model
+# model prepared in script [Hillier-Cornulier N2O model.R]
+load(find_onedrive(dir = data_repo, path = "Jon H N2O paper/H-C N2O model lite.RData"))
 
+# below is for verification against shiny app
+test1.base <- data.frame(Fert01 = 0, lowNO3 = 0, highNO3 = 0, Grasslands = FALSE, 
+                          pH = 5, Clay = 25, SOC = 3, # pH @ median, Clay @ median, SOC @ 2%
+                          WetDays.exp = 100, DegDays.exp= 3500, # @ Germany over 1 year
+                          N.rate = 200, studyID.f= " 32.58 119.702007 8  8120082007-08-152007-11-04") # some random studyID.f (the first one)
+test1.base <- df.M15c.complete(test1.base)
+test1.base.pred <- exp(predict(jamM15c, newdata= test1.base))
+
+test1.fert <- data.frame(Fert01 = 1, lowNO3 = 0, highNO3 = 0, Grasslands = FALSE, 
+                         pH = 5, Clay = 25, SOC = 3, # pH @ median, Clay @ median, SOC @ 2%
+                         WetDays.exp = 100, DegDays.exp= 3500, # @ Germany over 1 year
+                         N.rate = 200, studyID.f= " 32.58 119.702007 8  8120082007-08-152007-11-04") # some random studyID.f (the first one)
+test1.fert <- df.M15c.complete(test1.fert)
+test1.fert.pred <- exp(predict(jamM15c, newdata= test1.fert))
+test1.ef <- (test1.fert.pred - test1.base.pred) / 200
+test1.base.pred
+test1.fert.pred
+test1.ef
+
+library(raster)
+library(tidyverse)
+library(ncdf4)
+
+# test code for dealing with netCDF climate data
+nc_open("~/Downloads/cru_ts4-03-2011-2018-wet-dat.nc")
+wet_days <- brick("~/Downloads/cru_ts4-03-2011-2018-wet-dat.nc", varname = "wet")
+rm(nc)
+?raster::brick
+# how pleasantly successful...
+# conversion to raster??
