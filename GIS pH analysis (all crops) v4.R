@@ -427,37 +427,200 @@ DA_dat <- bind_rows(list(England = Eng_df, `Northern Ireland` = NI_df, Scotland 
 
 Dat_main <- left_join(Dat_main, DA_dat, by = c("x", "y"))
 
+#####################
 # added 21/01/2020 to include N2O predictions using the Hillier/Cornulier model
+#####################
+
+####################
+# augmenting main dataset with additional variables req'd for N2O model
+library(ncdf4)
+
+# 8 year dataset of wet days / month
+nc_open(find_onedrive(dir = data_repo, path = "GIS data/CRU TS v4-03/cru_ts4.03.2011.2018.wet.dat.nc"))
+
+# convert to raster brick
+wet_days <- brick(find_onedrive(dir = data_repo, path = "GIS data/CRU TS v4-03/cru_ts4.03.2011.2018.wet.dat.nc"), varname = "wet")
+
+# cropping for efficiency, but not masking until we resample
+wet_days <- wet_days %>% crop(UK)
+
+# resample to master stack values
+wet_days <- wet_days %>% resample(Master_stack[[1]])
+
+# mask to UK
+wet_days <- wet_days %>% mask(UK)
+
+# convert to df
+Dat_wetdays <- wet_days %>%
+  as.data.frame(xy = T) %>%
+  as_tibble() %>%
+  drop_na()
+
+# gather and prep year variable
+Dat_wetdays <- Dat_wetdays %>%
+  gather(-x, -y, key = "Year", value = "Wet_days") %>%
+  mutate(Year = Year %>%
+           str_replace_all("\\..+", "") %>%
+           str_replace_all("X", "") %>%
+           as.numeric())
+
+# annual sums
+Dat_wetdays <- Dat_wetdays %>%
+  group_by(x, y, Year) %>%
+  summarise(Wet_days = sum(Wet_days),
+            n = n())
+
+Dat_wetdays$n %>% table()
+
+# 8-year average
+Dat_wetdays <- Dat_wetdays %>%
+  group_by(x, y) %>%
+  summarise(Wet_days_mean = mean(Wet_days),
+            Wet_days_sd = sd(Wet_days),
+            Wet_days_se = sd(Wet_days) / sqrt(n()),
+            Wet_days_min = min(Wet_days),
+            Wet_days_max = max(Wet_days)) %>%
+  ungroup()
+
+# anti_join(Dat_wetdays, Dat_main, by = c("x", "y")) # anti join checked, all required cells match fine (some non-joined cells in areas cut from Dat_main)
+
+#ggplot(Dat_wetdays, aes(x = x, y = y, fill = Wet_days_se)) +
+#  geom_raster() +
+#  coord_quickmap() +
+#  theme_void()
+
+# read in WorldClim temperature data
+temperature <- raster::stack()
+for(i in 1:12){
+  path <- find_onedrive(dir = data_repo, path = paste("GIS data/Average temperature (oC)/wc2.0_5m_tavg_", formatC(i, width=2, flag="0"), ".tif", sep=""))
+  x <- raster(path)
+  temperature <- addLayer(temperature, x)
+}
+rm(x, i , path)
+
+# convert to UK DF and calculate degree days
+library(lubridate)
+
+temperature <- temperature %>%
+  crop(UK) %>%
+  resample(Master_stack[[1]]) %>%
+  mask(UK)
+
+Dat_temp <- temperature %>%
+  as.data.frame(xy = T) %>%
+  as_tibble() %>%
+  drop_na() %>%
+  gather(-x, -y, key = "Key", value = "oC") %>%
+  mutate(Date = paste0("01/", str_sub(Key, start = -2L, end = -1L), "/2019") %>% dmy(), # random non-leap year
+         Days = days_in_month(Date),
+         Degree_days = oC * Days) %>%
+  group_by(x, y) %>%
+  summarise(Degree_days = sum(Degree_days)) %>%
+  ungroup()
+
+# N rate data based on analysis of BSFP reports
+Dat_fert <- read_csv(find_onedrive(dir = data_repo, path = "N rate data/BSFP Fertiliser rates annual summary.csv"))
+Dat_man <- read_csv(find_onedrive(dir = data_repo, path = "N rate data/BSFP manure rates summary.csv"))
+
+Dat_man <- Dat_man %>%
+  gather(3:10, key = "Year", value = "Rate") %>%
+  group_by(`Crop type`, Nutrient) %>%
+  summarise(Rate = mean(Rate)) %>%
+  filter(Nutrient == "N (kg / ha)") %>%
+  select(-Nutrient) %>%
+  rename(Crop_name3 = `Crop type`, Mrate_mean = Rate)
+
+Dat_Nrate <- Dat_main %>%
+  distinct(Crop) %>%
+  arrange(Crop) %>%
+  mutate(Crop_name2 = c("Winter barley", "Minor cereals", "Linseed", "Grass < 5", "Potatoes", "Other arable", "Oilseed Rape", "Rootcrops and brassicae", "Wheat"),
+         Crop_name3 = c("Winter sown", "Winter sown", "Spring sown", "Grass", "Spring sown", "Winter sown", "Winter sown", "Spring sown", "Winter sown")) %>%
+  left_join(Dat_fert %>% select(Crop_name2, Frate_mean = Nrate_mean), by = "Crop_name2") %>%
+  left_join(Dat_man %>% select(Crop_name3, Mrate_mean), by = "Crop_name3") %>%
+  mutate(Nrate = Frate_mean + Mrate_mean) %>%
+  select(Crop, Nrate)
+
+#################
+# add data into main workflow and calculate new variables
+
+# join up new data for N2O model to new model dataset
+Dat_model <- Dat_main %>%
+  select(x, y, Crop, Clay, OC, BD, pH, SOCchange_frac, Target_pH) %>%
+  left_join(Dat_wetdays %>% select(x, y, Wet_days_mean), by = c("x", "y")) %>%
+  left_join(Dat_temp, by =  c("x", "y")) %>%
+  left_join(Dat_Nrate, by = "Crop")
+
+# function to calculate OC percentage based on C (t/ha) and BD (kg / m2)
+OC_perc <- function(BD_kg_m2, C_t_ha){
+  C_kg_m2 <- C_t_ha * 10^3 * 10^-4 * 1 / 0.3
+  Cfrac <- C_kg_m2 / BD_kg_m2
+  Cperc <- Cfrac * 100
+  return(Cperc)
+}
+
+# calculate required variables
+Dat_model <- Dat_model %>%
+  mutate(Is_grass = Crop == "Pasture",
+         C_perc_initial = OC_perc(BD, OC),
+         C_perc_final = C_perc_initial * SOCchange_frac)
+
+#################
+# Make predictions with N2O model
+
 # model prepared in script [Hillier-Cornulier N2O model.R]
 load(find_onedrive(dir = data_repo, path = "Jon H N2O paper/H-C N2O model lite.RData"))
 
-# below is for verification against shiny app
-test1.base <- data.frame(Fert01 = 0, lowNO3 = 0, highNO3 = 0, Grasslands = FALSE, 
-                          pH = 5, Clay = 25, SOC = 3, # pH @ median, Clay @ median, SOC @ 2%
-                          WetDays.exp = 100, DegDays.exp= 3500, # @ Germany over 1 year
-                          N.rate = 200, studyID.f= " 32.58 119.702007 8  8120082007-08-152007-11-04") # some random studyID.f (the first one)
-test1.base <- df.M15c.complete(test1.base)
-test1.base.pred <- exp(predict(jamM15c, newdata= test1.base))
+# we need base + fertilised predictions for initial pH + optimal pH
+# i.e. 4x predictions
 
-test1.fert <- data.frame(Fert01 = 1, lowNO3 = 0, highNO3 = 0, Grasslands = FALSE, 
-                         pH = 5, Clay = 25, SOC = 3, # pH @ median, Clay @ median, SOC @ 2%
-                         WetDays.exp = 100, DegDays.exp= 3500, # @ Germany over 1 year
-                         N.rate = 200, studyID.f= " 32.58 119.702007 8  8120082007-08-152007-11-04") # some random studyID.f (the first one)
-test1.fert <- df.M15c.complete(test1.fert)
-test1.fert.pred <- exp(predict(jamM15c, newdata= test1.fert))
-test1.ef <- (test1.fert.pred - test1.base.pred) / 200
-test1.base.pred
-test1.fert.pred
-test1.ef
+# baseline N2O emissions, inital pH
+ipH_base <- data.frame(Fert01 = 0, lowNO3 = 0, highNO3 = 0, Grasslands = Dat_model$Is_grass, 
+                       pH = Dat_model$pH, Clay = Dat_model$Clay, SOC = Dat_model$C_perc_initial,
+                       WetDays.exp = Dat_model$Wet_days_mean, DegDays.exp= Dat_model$Degree_days,
+                       N.rate = Dat_model$Nrate, studyID.f= " 32.58 119.702007 8  8120082007-08-152007-11-04") # some random studyID.f (the first one)
+ipH_base <- df.M15c.complete(ipH_base)
+Dat_model <- Dat_model %>%
+  mutate(ipH_base_pred = exp(predict(jamM15c, newdata = ipH_base)))
 
-library(raster)
-library(tidyverse)
-library(ncdf4)
+# fertiliser-induced N2O emissions, initial pH
+ipH_fert <- data.frame(Fert01 = 1, lowNO3 = 0, highNO3 = 0, Grasslands = Dat_model$Is_grass, 
+                       pH = Dat_model$pH, Clay = Dat_model$Clay, SOC = Dat_model$C_perc_initial,
+                       WetDays.exp = Dat_model$Wet_days_mean, DegDays.exp= Dat_model$Degree_days,
+                       N.rate = Dat_model$Nrate, studyID.f= " 32.58 119.702007 8  8120082007-08-152007-11-04") # some random studyID.f (the first one)
+ipH_fert <- df.M15c.complete(ipH_fert)
+Dat_model <- Dat_model %>%
+  mutate(ipH_fert_pred = exp(predict(jamM15c, newdata = ipH_fert)))
 
-# test code for dealing with netCDF climate data
-nc_open("~/Downloads/cru_ts4-03-2011-2018-wet-dat.nc")
-wet_days <- brick("~/Downloads/cru_ts4-03-2011-2018-wet-dat.nc", varname = "wet")
-rm(nc)
-?raster::brick
-# how pleasantly successful...
-# conversion to raster??
+# baseline N2O emissions, final pH
+fpH_base <- data.frame(Fert01 = 0, lowNO3 = 0, highNO3 = 0, Grasslands = Dat_model$Is_grass, 
+                       pH = Dat_model$Target_pH, Clay = Dat_model$Clay, SOC = Dat_model$C_perc_final,
+                       WetDays.exp = Dat_model$Wet_days_mean, DegDays.exp= Dat_model$Degree_days,
+                       N.rate = Dat_model$Nrate, studyID.f= " 32.58 119.702007 8  8120082007-08-152007-11-04") # some random studyID.f (the first one)
+fpH_base <- df.M15c.complete(fpH_base)
+Dat_model <- Dat_model %>%
+  mutate(fpH_base_pred = exp(predict(jamM15c, newdata = fpH_base)))
+
+# fertiliser-induced N2O emissions, final pH
+fpH_fert <- data.frame(Fert01 = 1, lowNO3 = 0, highNO3 = 0, Grasslands = Dat_model$Is_grass, 
+                       pH = Dat_model$Target_pH, Clay = Dat_model$Clay, SOC = Dat_model$C_perc_final,
+                       WetDays.exp = Dat_model$Wet_days_mean, DegDays.exp= Dat_model$Degree_days,
+                       N.rate = Dat_model$Nrate, studyID.f= " 32.58 119.702007 8  8120082007-08-152007-11-04") # some random studyID.f (the first one)
+fpH_fert <- df.M15c.complete(fpH_fert)
+Dat_model <- Dat_model %>%
+  mutate(fpH_fert_pred = exp(predict(jamM15c, newdata = fpH_fert)))
+
+
+# calculate EFs x 2 (initial + final pH)
+Dat_model <- Dat_model %>%
+  mutate(EF_initial = (ipH_fert_pred - ipH_base_pred) / Nrate,
+         EF_final = (fpH_fert_pred - fpH_base_pred) / Nrate)
+
+# calculate direct N2O emissions and difference in kg CO2-eq / ha
+Dat_model <- Dat_model %>%
+  mutate(iN2O = Nrate * EF_initial * 44/28,
+         fN2O = Nrate * EF_final * 44/28,
+         cN2O_CO2eq = (fN2O - iN2O) * 298)
+
+qplot(Dat_model$cN2O_CO2eq)
+mean(Dat_model$cN2O_CO2eq, na.rm = T)
+
