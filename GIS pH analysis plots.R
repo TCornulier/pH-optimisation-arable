@@ -1,10 +1,13 @@
 # script to create plots and outputs for manuscript from script [GIS pH analysis (all crops) v4.R]
 #setwd("~/Documents/SRUC/DEFRA Clean Growth Project/pH Optimisation/Extension for publication/Output plots")
+library(tidyverse)
 library(RColorBrewer)
 
 data_repo <- "DEFRA Clean Growth Project/pH Optimisation/Extension for publication"
 
 load("Full model output df.RData")
+
+Dat_main <- Dat_main %>% filter(!is.na(Abatement)) # remove one row where the N2O model misfired
 
 ##########################
 # abatement map for UK
@@ -30,23 +33,23 @@ Dat_summ1 %>% filter(is.na(Abatement_fac)) %>% nrow()
 
 ggplot() +
   geom_raster(data = Dat_summ1 %>% mutate(Abatement = ifelse(Abatement > 2500, 2500, Abatement)), aes(x = x, y = y, fill = Abatement)) +
-  #geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
+  geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
   xlim(c(-10, 5)) +
   ylim(c(49, 62)) +
   scale_fill_gradient2(low = "darkred", mid = "lightgrey", high = "darkgreen") +
   labs(fill = "Abatement\npotential\n(tonnes)") +
   coord_quickmap() +
   theme_void()
-# ggsave("Output plots/Abatement map UK.png", width = 8, height = 7)
+ggsave(find_onedrive(dir = data_repo, path = "Output plots/Abatement map UK.png"), width = 8, height = 7)
 
 ggplot() +
   geom_raster(data = Dat_summ1, aes(x = x, y = y, fill = Abatement_fac), alpha = 0.7) +
-  #geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
+  geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
   scale_fill_brewer(type = "div", palette = "RdBu") +
   labs(fill = expression("AP (CO"[2]*"-eq)")) +
   coord_quickmap() +
   theme_void()
-# ggsave("Output plots/Abatement map UK discrete.png", width = 8, height = 7)
+ggsave(find_onedrive(dir = data_repo, path = "Output plots/Abatement map UK discrete.png"), width = 8, height = 7)
 
 
 ##########################
@@ -58,14 +61,17 @@ Dat_main %>%
   summarise(Abatement = sum(Abatement),
             Area_ha = sum(Area_ha),
             Abatement_ha = Abatement / Area_ha) %>%
+  filter(Abatement_ha <= quantile(Abatement_ha, 0.975),
+         Abatement_ha >= quantile(Abatement_ha, 0.025)) %>% # added to get rid of a couple of outliers which throw off the scale
   ggplot() +
   geom_raster(aes(x = x, y = y, fill = Abatement_ha), alpha = 0.7) +
-  #geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
-  scale_fill_gradient2(low = "darkred", mid = "lightgrey", high = "darkgreen") +
+  geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
+  #scale_fill_gradient2(low = "darkred", mid = "white", high = "darkgreen") +
+  scale_fill_distiller(palette = "YlGnBu") +
   labs(fill = expression("Abatement\npotential\n(tonnes CO"[2]*"-eq ha"^{-1}*")")) +
   coord_quickmap() +
   theme_void()
-#ggsave("Output plots/Abatement map UK per ha.png", width = 8, height = 7)
+ggsave(find_onedrive(dir = data_repo, path = "Output plots/Abatement map UK per ha.png"), width = 8, height = 7)
 
 ##########################
 # MAC map for UK
@@ -91,7 +97,7 @@ ggplot() +
   labs(fill = expression('Marginal\nabatement\ncost\n(£ tonne CO'[2]*'-eq'^{-1}*')')) +
   coord_quickmap() +
   theme_void()
-# ggsave("Output plots/MAC map UK.png", width = 8, height = 7)
+ggsave(find_onedrive(dir = data_repo, path = "Output plots/MAC map UK.png"), width = 8, height = 7)
 
 ##########################
 # crop map for UK
@@ -118,7 +124,7 @@ Dat_main %>%
   labs(fill = "") +
   coord_quickmap() +
   theme_void()
-ggsave("Output plots/Dominant arable crop map UK.png", width = 8, height = 7)
+ggsave(find_onedrive(dir = data_repo, path = "Output plots/Dominant arable crop map UK.png"), width = 8, height = 7)
 
 ##########################
 # pH map of UK
@@ -128,9 +134,10 @@ ggplot() +
   geom_raster(data = Dat_main, aes(x = x, y = y, fill = pH), alpha = 0.7) +
   geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
   coord_quickmap() +
-  scale_fill_gradient(low = "coral3", high = "cadetblue3") +
+  #scale_fill_gradient(low = "coral3", high = "cadetblue3") +
+  scale_fill_distiller(palette = "YlGnBu", direction = -1) +
   theme_void()
-#ggsave(find_onedrive(dir = data_repo, path = "Output plots/UK pH map.png"), width = 8, height = 7)
+ggsave(find_onedrive(dir = data_repo, path = "Output plots/UK pH map.png"), width = 8, height = 7)
 
 ##########################
 # how much land area is lost by removing unmatched crops?
@@ -158,13 +165,13 @@ Dat_main %>%
          xav = (xmin + xmax) / 2) %>%
   ggplot() +
   geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = Crop), colour = NA) +
-  geom_hline(yintercept = 66.1, size = 0.1, colour = "black", lty = 2) +
+  geom_hline(yintercept = 66.1, size = 0.1, colour = "grey", lty = 2) +
   scale_fill_manual(values = Crop_colours) +
   labs(x = expression('Abatement potential (kt CO'[2]*'eq year'^{-1}*')'),
        y = expression('Marginal abatement cost (GBP tonne CO'[2]*'-eq'^{-1}*')'),
        fill = "") +
   theme_classic()
-# ggsave("Output plots/UK full MACC.png", width = 8, height = 5)
+ggsave(find_onedrive(dir = data_repo, path = "Output plots/UK full MACC.png"), width = 8, height = 7)
 
 ###############################
 # devolved administration MACCs
@@ -184,14 +191,14 @@ Dat_main %>%
          xav = (xmin + xmax) / 2) %>%
   ggplot() +
   geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = Crop), colour = NA) +
-  geom_hline(yintercept = 66.1, size = 0.1, colour = "black", lty = 2) +
+  geom_hline(yintercept = 66.1, size = 0.1, colour = "grey", lty = 2) +
   scale_fill_manual(values = Crop_colours) +
   labs(x = expression('Abatement potential (kt CO'[2]*'eq year'^{-1}*')'),
        y = expression('Marginal abatement cost (GBP tonne CO'[2]*'-eq'^{-1}*')'),
        fill = "") +
   facet_wrap(~DA, nrow = 2) +
   theme_classic()
-# ggsave("Output plots/DA MACCs.png", width = 8, height = 5)
+ggsave(find_onedrive(dir = data_repo, path = "Output plots/DA MACCs.png"), width = 8, height = 7)
 
 ############################
 # table 1 (defra liming factors)
@@ -228,7 +235,7 @@ Dat_main %>% ggplot(aes(x = Crop, y = Yield_increase, fill = DA)) +
   labs(x = "", y = "Limed yield (relative)", fill = "") +
   coord_flip() +
   theme_classic()
-# ggsave("Output plots/Fractional yield increase.png", width = 8, height = 4)
+ggsave(find_onedrive(dir = data_repo, path = "Output plots/Fractional yield increase.png"), width = 8, height = 7)
 
 ############################
 # yield increase columns
@@ -254,7 +261,7 @@ Dat_main %>%
   scale_fill_brewer(palette = "Blues") +
   coord_flip() +
   theme_classic()
-# ggsave(find_onedrive(dir = data_repo, path = "Output plots/Additional crop production.png"), width = 8, height = 3)
+ggsave(find_onedrive(dir = data_repo, path = "Output plots/Additional crop production.png"), width = 8, height = 3)
 
 # table 2
 write_csv(Dat_saleval %>% dplyr::select(-Bycrop_ratio), "Output plots/Table 2.csv")
@@ -434,7 +441,7 @@ Dat_main %>%
        fill = "") +
   coord_flip() +
   theme_classic()
-# ggsave("Output plots/Headline area x crop x DA.png", width = 8, height = 3)
+ggsave(find_onedrive(dir = data_repo, path = "Output plots/Headline area x crop x DA.png"), width = 8, height = 7)
 
 ggplot(SOC_dat %>% filter(Experiment != "Tu")) +
   geom_point(aes(x = pH_std2, y = SOC_std2, shape = Experiment, colour = Experiment), alpha = 0.3) +
