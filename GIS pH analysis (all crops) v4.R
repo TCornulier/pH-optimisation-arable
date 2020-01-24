@@ -124,6 +124,23 @@ Dat_main <- Dat_main %>%
   mutate(Area_ha = ifelse(Area_ha == 0, NA, Area_ha)) %>%
   drop_na(Area_ha)
 
+# process rasters so we can make plots at DA level
+template <- Master_stack[[1]]
+England <- template %>% mask(subset(UK, UK@data[["NAME_1"]]=="England"))
+Northern_Ireland <- template %>% mask(subset(UK, UK@data[["NAME_1"]]=="Northern Ireland"))
+Scotland <- template %>% mask(subset(UK, UK@data[["NAME_1"]]=="Scotland"))
+Wales <- template %>% mask(subset(UK, UK@data[["NAME_1"]]=="Wales"))
+
+Eng_df <- England %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
+NI_df <- Northern_Ireland %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
+Scot_df <- Scotland %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
+Wales_df <- Wales %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
+
+DA_dat <- bind_rows(list(England = Eng_df, `Northern Ireland` = NI_df, Scotland = Scot_df, Wales = Wales_df), .id = "DA")  %>%
+  dplyr::select(-PHIHOX_M_sl4_5km_ll)
+
+Dat_main <- left_join(Dat_main, DA_dat, by = c("x", "y"))
+
 # cumulative probability distribution for pH under different crops
 Dat_cdf <- Dat_main %>%
   mutate(pH = pH %>% round(1)) %>%
@@ -367,16 +384,13 @@ Dat_main <- Dat_main %>%
   mutate(OC_lime = OC * SOCchange_frac,
          GHGmit_SOC = ((OC_lime - OC) * 44/12) / 20)
 
-# calculate emissions from lime application and mitigation balance
+# calculate emissions from lime application
 Dat_main <- Dat_main %>%
   mutate(Limerate = (LF * (pH_diff + 0.2)) / 5, # Assuming a 5 year interval between applications (based on a variety of data sources) + 0.2 pH unit overshoot as recommended in RB209
          Limeemb_GHG = 0.074 * Limerate, # Kool et al. (2012)
          Limedir_GHG = 0.125 * 44/12 * Limerate, # IPCC (2006)
-         Dies_GHG = (336 * 0.7) / 36.9 * 3.165 * 10^-3, # Williams et al (2006) for diesel usage * DEFRA/DECC for EF
-         
-         Tot_GHGmit = GHGmit_yield + GHGmit_SOC,
-         Tot_GHG = Limeemb_GHG + Limedir_GHG + Dies_GHG,
-         GHG_balance = Tot_GHG - Tot_GHGmit)
+         Dies_GHG = (336 * 0.7) / 36.9 * 3.165 * 10^-3) # Williams et al (2006) for diesel usage * DEFRA/DECC for EF
+
 
 # sale values for different crops from FMH 17/18, all in 2017 GBP
 # for grass, estimate is mean production cost from FMH 17/18
@@ -401,31 +415,6 @@ Dat_main <- Dat_main %>%
          
          Cost_net_ha = (Lime_cost + Cont_cost) - Crop_revenue_net
          )
-
-# calculate abatement and MAC
-Dat_main <- Dat_main %>%
-  mutate(Abatement = -GHG_balance * Area_ha,
-         Abatement_SOConly = -(Tot_GHG - GHGmit_SOC) * Area_ha,
-         Abatement_EIonly = -(Tot_GHG - GHGmit_yield) * Area_ha,
-         Cost_net = Cost_net_ha * Area_ha,
-         MAC = Cost_net / Abatement)
-
-# process rasters so we can make plots at DA level
-template <- Master_stack[[1]]
-England <- template %>% mask(subset(UK, UK@data[["NAME_1"]]=="England"))
-Northern_Ireland <- template %>% mask(subset(UK, UK@data[["NAME_1"]]=="Northern Ireland"))
-Scotland <- template %>% mask(subset(UK, UK@data[["NAME_1"]]=="Scotland"))
-Wales <- template %>% mask(subset(UK, UK@data[["NAME_1"]]=="Wales"))
-
-Eng_df <- England %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
-NI_df <- Northern_Ireland %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
-Scot_df <- Scotland %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
-Wales_df <- Wales %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
-
-DA_dat <- bind_rows(list(England = Eng_df, `Northern Ireland` = NI_df, Scotland = Scot_df, Wales = Wales_df), .id = "DA")  %>%
-  dplyr::select(-PHIHOX_M_sl4_5km_ll)
-
-Dat_main <- left_join(Dat_main, DA_dat, by = c("x", "y"))
 
 #####################
 # added 21/01/2020 to include N2O predictions using the Hillier/Cornulier model
@@ -624,3 +613,23 @@ Dat_model <- Dat_model %>%
 qplot(Dat_model$cN2O_CO2eq)
 mean(Dat_model$cN2O_CO2eq, na.rm = T)
 
+#####################
+# add N2O predictions to main data and scale
+
+Dat_main <- Dat_main %>%
+  mutate(GHGmit_N2O = abs(as.numeric(Dat_model$cN2O_CO2eq) * 10^-3))
+
+# calculate GHG balance in tonnes / ha
+Dat_main <- Dat_main %>%
+  mutate(Tot_GHGmit = GHGmit_yield + GHGmit_SOC + GHGmit_N2O,
+         Tot_GHG = Limeemb_GHG + Limedir_GHG + Dies_GHG,
+         GHG_balance = Tot_GHG - Tot_GHGmit)
+
+# calculate abatement and MAC
+Dat_main <- Dat_main %>%
+  mutate(Abatement = -GHG_balance * Area_ha,
+         Abatement_SOConly = -(Tot_GHG - GHGmit_SOC) * Area_ha,
+         Abatement_EIonly = -(Tot_GHG - GHGmit_yield) * Area_ha,
+         Abatement_N2Oonly = -(Tot_GHG - GHGmit_N2O) * Area_ha,
+         Cost_net = Cost_net_ha * Area_ha,
+         MAC = Cost_net / Abatement)
