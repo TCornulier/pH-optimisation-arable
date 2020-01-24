@@ -4,6 +4,8 @@ library(RColorBrewer)
 
 data_repo <- "DEFRA Clean Growth Project/pH Optimisation/Extension for publication"
 
+load("Full model output df.RData")
+
 ##########################
 # abatement map for UK
 ##########################

@@ -633,3 +633,6 @@ Dat_main <- Dat_main %>%
          Abatement_N2Oonly = -(Tot_GHG - GHGmit_N2O) * Area_ha,
          Cost_net = Cost_net_ha * Area_ha,
          MAC = Cost_net / Abatement)
+
+# save .RData for plots
+save(Dat_main, UK, Dat_cdf, SOC_dat, file = "Full model output df.RData")
