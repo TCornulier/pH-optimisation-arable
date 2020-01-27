@@ -3,6 +3,9 @@
 library(fastDummies)
 library(rpart)
 
+# load workspace
+load("Full model output df.RData")
+
 # pull out primary data and classifier for simplified decision tree model
 Dat_model <- Dat_main %>%
   mutate(has_abatement = as.numeric(GHG_balance <= -0.1),
