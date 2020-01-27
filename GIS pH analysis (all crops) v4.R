@@ -13,7 +13,7 @@ Soil_stack <- stack(find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5k
                     find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Sand content/Fixed/SNDPPT_M_sl4_5km_ll.tif"), # sand %
                     find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Silt content/Fixed/SLTPPT_M_sl4_5km_ll.tif"), # silt %
                     find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Clay content/Fixed/CLYPPT_M_sl4_5km_ll.tif"), # clay %
-                    find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/OC tonnes per ha/Fixed/OCSTHA_M_sd4_5km_ll.tif"), # OC tonnes per ha
+                    find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/OC tonnes per ha/Fixed/OCSTHA_M_30cm_5km_ll.tif"), # OC tonnes per ha
                     find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Bulk density/Fixed/BLDFIE_M_sl4_5km_ll.tif"))
 
 # read in crop area raster data and stack
@@ -78,7 +78,7 @@ Dat_main <- Dat_main %>%
          Sand = SNDPPT_M_sl4_5km_ll,
          Silt = SLTPPT_M_sl4_5km_ll,
          Clay = CLYPPT_M_sl4_5km_ll,
-         OC = OCSTHA_M_sd4_5km_ll,
+         OC = OCSTHA_M_30cm_5km_ll,
          BD = BLDFIE_M_sl4_5km_ll,
          Cell_area_km2 = layer,
          phys_area_pasture = UK.pasture.area.10km.CLC.based.WGS84.lowland.workable,
