@@ -265,16 +265,16 @@ ggsave(find_onedrive(dir = data_repo, path = "Output plots/Fractional yield incr
 order <- Dat_main %>%
   filter(GHG_balance <= -0.1) %>%
   group_by(Crop) %>%
-  mutate(Yield_inc_tha = Yield_tha * (Yield_increase - 1)) %>%
-  summarise(Yield_inc_t = sum(Yield_inc_tha)) %>%
+  mutate(Yield_inc_t = Yield_tha * (Yield_increase - 1) * Area_ha) %>%
+  summarise(Yield_inc_t = sum(Yield_inc_t)) %>%
   arrange(Yield_inc_t) %>%
   pull(Crop)
 
 Dat_main %>%
   filter(GHG_balance <= -0.1) %>%
-  mutate(Yield_inc_ktha = Yield_tha * (Yield_increase - 1) * 10^-3) %>%
+  mutate(Yield_inc_kt = Yield_tha * (Yield_increase - 1) * Area_ha * 10^-3) %>%
   group_by(Crop, DA) %>%
-  summarise(Yield_inc_kt = sum(Yield_inc_ktha)) %>%
+  summarise(Yield_inc_kt = sum(Yield_inc_kt)) %>%
   ungroup() %>%
   mutate(Crop = factor(Crop, levels = order)) %>%
   ggplot(aes(x = Crop, y = Yield_inc_kt)) +
@@ -321,7 +321,10 @@ Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Lime_tot = Limerate * Area_h
 Dat_main %>% mutate(Lime_tot = Limerate * Area_ha) %>% pull(Lime_tot) %>% sum() * 10^-3 # all crops
 
 # abatement in kt
-Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Abatement) %>% sum() * 10^-3
+d2a + d2b # total land area w/ abatement
+Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Abatement) %>% sum() * 10^-3 # total
+Dat_main %>% filter(Crop != "Pasture", GHG_balance <= -0.1) %>% pull(Abatement) %>% sum() * 10^-3 # crops
+Dat_main %>% filter(Crop == "Pasture", GHG_balance <= -0.1) %>% pull(Abatement) %>% sum() * 10^-3 # grass
 
 # overall yield increase in kt (arable)
 yield_inc <- Dat_main %>%
@@ -333,15 +336,15 @@ yield_inc <- Dat_main %>%
 
 yield_inc / d1a
 
+# overall yield increase in kt (grass)
 yield_inc_grass <- Dat_main %>%
   filter(Crop == "Pasture") %>%
   mutate(Yield_inc_ktha = Yield_tha * (Yield_increase - 1) * 10^-3,
          Yield_inc_kt = Yield_inc_ktha * Area_ha) %>%
   pull(Yield_inc_kt) %>%
   sum()
-yield_inc_grass / d1b
 
-# equal to about 362 kg / ha over ENTIRE area
+yield_inc_grass / d1b
 
 
 # yield increase in kt only in areas where net abatement is possible
@@ -352,6 +355,7 @@ yield_inc_ab <- Dat_main %>%
          Yield_inc_kt = Yield_inc_ktha * Area_ha) %>%
   pull(Yield_inc_kt) %>%
   sum()
+
 yield_inc_ab / d2a
 
 yield_inc_ab_grass <- Dat_main %>%
@@ -361,7 +365,7 @@ yield_inc_ab_grass <- Dat_main %>%
          Yield_inc_kt = Yield_inc_ktha * Area_ha) %>%
   pull(Yield_inc_kt) %>%
   sum()
-yield_inc_ab / d2b
+yield_inc_ab_grass / d2b
 
 #####################
 # emissions + abatement
