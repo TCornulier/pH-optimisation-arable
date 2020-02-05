@@ -9,11 +9,11 @@ data_repo <- "DEFRA Clean Growth Project/pH Optimisation/Extension for publicati
 UK <- find_onedrive(dir = data_repo, path = "GIS data/DA shapefile/GBR_adm_shp/GBR_adm1.shp") %>% shapefile()
 
 # read in soil raster data and stack
-Soil_stack <- stack(find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Soil pH/Fixed/PHIHOX_M_sl4_5km_ll.tif") %>% raster(), # pH
+Soil_stack <- stack(#find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Soil pH/Fixed/PHIHOX_M_sl4_5km_ll.tif"), # pH
                     find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Sand content/Fixed/SNDPPT_M_sl4_5km_ll.tif"), # sand %
                     find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Silt content/Fixed/SLTPPT_M_sl4_5km_ll.tif"), # silt %
                     find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Clay content/Fixed/CLYPPT_M_sl4_5km_ll.tif"), # clay %
-                    find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/OC tonnes per ha/Fixed/OCSTHA_M_30cm_5km_ll.tif"), # OC tonnes per ha
+                    #find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/OC tonnes per ha/Fixed/OCSTHA_M_30cm_5km_ll.tif"), # OC tonnes per ha
                     find_onedrive(dir = data_repo, path = "GIS data/SoilGrids 5km/Bulk density/Fixed/BLDFIE_M_sl4_5km_ll.tif"))
 
 # read in crop area raster data and stack
@@ -48,42 +48,56 @@ Area <- Soil_stack[[1]] %>% area()
 Soil_stack <- addLayer(Soil_stack, Area)
 rm(Area)
 
-# aggregate
+# consolidate
 Master_stack <- stack(Soil_stack, Crop_area_stack, Crop_yield_stack)
 rm(Soil_stack, Crop_area_stack, Crop_yield_stack)
 
 # mask out to UK only
 Master_stack <- Master_stack %>% crop(UK) %>% mask(UK)
 
-# add in pasture area and yield data to master stack
-pasture_area <- find_onedrive(dir = "GIS data repository", path = "Created rasters/UK-pasture-area-10km-CLC-based-WGS84-lowland-workable.tif") %>% raster()
-pasture_yield <- find_onedrive(dir = "GIS data repository", path = "Created rasters/UK-pasture-yield-RB209-10km.tif") %>% raster()
+# read data created using CLC raster as base —
+# pasture area and yield data (created in Pasture preprocessing scripts)
+# land use specific SOC stocks and pH (created in [Soil preprocessing.R])
+# fraction of land use type under mineral soils (i.e. not under peat), created in [Soil preprocessing.R]
+CLC_stack <- stack(find_onedrive(dir = "GIS data repository", path = "Created rasters/UK-crop-SOC-tonnes-ha-10km-CLC-SG250-WGS84.tif"),
+                   find_onedrive(dir = "GIS data repository", path = "Created rasters/UK-crop-pH-10km-CLC-SG250-WGS84.tif"),
+                   find_onedrive(dir = "GIS data repository", path = "Created rasters/UK-pasture-SOC-tonnes-ha-10km-CLC-SG250-WGS84.tif"),
+                   find_onedrive(dir = "GIS data repository", path = "Created rasters/UK-pasture-pH-10km-CLC-SG250-WGS84.tif"),
+                   find_onedrive(dir = "GIS data repository", path = "Created rasters/UK-crop-fraction-not-under-peat-10km-CLC-based-WGS84.tif"),
+                   find_onedrive(dir = "GIS data repository", path = "Created rasters/UK-pasture-fraction-not-under-peat-10km-CLC-based-WGS84.tif"),
+                   find_onedrive(dir = "GIS data repository", path = "Created rasters/UK-pasture-area-10km-CLC-based-WGS84-lowland-workable.tif"),
+                   find_onedrive(dir = "GIS data repository", path = "Created rasters/UK-pasture-yield-RB209-10km.tif"))
 
 # resample
-pasture_area <- pasture_area %>% resample(Master_stack)
-pasture_yield <- pasture_yield %>% resample(Master_stack)
+CLC_stack <- CLC_stack %>% resample(Master_stack)
 
-Master_stack <- stack(Master_stack, pasture_area, pasture_yield)
-rm(pasture_area, pasture_yield)
+# consolidate
+Master_stack <- stack(CLC_stack, Master_stack)
+rm(CLC_stack)
 
 # convert to dataframe
-Dat_main <- Master_stack %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
+Dat_main <- Master_stack %>% as.data.frame(xy = T) %>% drop_na(SNDPPT_M_sl4_5km_ll) # nothing special about sand % except it has full land area coverage — NA = sea or water body
 # we have zeros, >0s and NAs in the area data, NAs and >0s only in the yield data
 
 Dat_main <- Dat_main %>%
   tbl_df %>%
   rename(x = x,
          y = y,
-         pH = PHIHOX_M_sl4_5km_ll,
+         OC_crop = UK.crop.SOC.tonnes.ha.10km.CLC.SG250.WGS84,
+         OC_pasture = UK.pasture.SOC.tonnes.ha.10km.CLC.SG250.WGS84,
+         pH_crop = UK.crop.pH.10km.CLC.SG250.WGS84,
+         pH_pasture = UK.pasture.pH.10km.CLC.SG250.WGS84,
+         Min_frac_crop = UK.crop.fraction.not.under.peat.10km.CLC.based.WGS84,
+         Min_frac_pasture = UK.pasture.fraction.not.under.peat.10km.CLC.based.WGS84,
+         phys_area_pasture = UK.pasture.area.10km.CLC.based.WGS84.lowland.workable,
+         yield_pasture = UK.pasture.yield.RB209.10km,
          Sand = SNDPPT_M_sl4_5km_ll,
          Silt = SLTPPT_M_sl4_5km_ll,
          Clay = CLYPPT_M_sl4_5km_ll,
-         OC = OCSTHA_M_30cm_5km_ll,
          BD = BLDFIE_M_sl4_5km_ll,
-         Cell_area_km2 = layer,
-         phys_area_pasture = UK.pasture.area.10km.CLC.based.WGS84.lowland.workable,
-         yield_pasture = UK.pasture.yield.RB209.10km) %>%
-  mutate(pH = pH / 10) # for some reason it's * 10 in original raster
+         Cell_area_km2 = layer) %>%
+  mutate(pH_crop = pH_crop / 10,
+         pH_pasture = pH_pasture / 10) # for some reason it's * 10 in original raster
 
 glimpse(Dat_main)
 
@@ -101,6 +115,12 @@ Dat_main <- Dat_main %>%
 Dat_main <- Dat_main %>%
   mutate(phys_area_pasture = phys_area_pasture * 10^6 / 10^4)
 
+# reorder to something sensible
+Dat_main <- Dat_main %>%
+  select(x:Min_frac_pasture, Sand:Cell_area_km2, # physical data
+         phys_area_pasture, phys_area_barley:phys_area_wheat, # crop area data
+         yield_pasture, yield_barley:yield_wheat) # crop yield data
+  
 # gather up into crop types and metrics (area/yield)
 # function to help rename crop variables
 first_upper <- function(string){
@@ -111,7 +131,7 @@ first_upper <- function(string){
 }
 
 Dat_main <- Dat_main %>%
-  gather(10:ncol(Dat_main), key = "key", value = "value") %>%
+  gather(14:ncol(Dat_main), key = "key", value = "value") %>%
   mutate(Crop = key %>% str_replace_all("(phys_area_)|(yield_)", "") %>%
            first_upper() %>%
            str_replace_all("_", " ") %>%
@@ -124,22 +144,43 @@ Dat_main <- Dat_main %>%
   mutate(Area_ha = ifelse(Area_ha == 0, NA, Area_ha)) %>%
   drop_na(Area_ha)
 
+# consolidate land-use-specific estimates now data is gathered
+Dat_main <- Dat_main %>%
+  mutate(OC = ifelse(Crop == "Pasture", OC_pasture, OC_crop),
+         pH = ifelse(Crop == "Pasture", pH_pasture, pH_crop),
+         Min_frac = ifelse(Crop == "Pasture", Min_frac_pasture, Min_frac_crop))
+
+# tidy up missing data (primarily some few areas where CLC didn't have crop data, but MapSPAM does, c. 600 cells)
+# only dropping a few rows at the very end
+Dat_main <- Dat_main %>%
+  mutate(OC = ifelse(is.na(OC), OC_pasture, OC), # first touch — replace NAs due to missing crop OC with equivalent pasture values
+         OC = ifelse(is.na(OC), OC_crop, OC), # some very few where no pasture data is present, but crop data is
+         pH = ifelse(is.na(pH), pH_pasture, pH), # exactly the same for pH
+         pH = ifelse(is.na(pH), pH_crop, pH),
+         Min_frac = ifelse(is.na(Min_frac), Min_frac_pasture, Min_frac), # and for mineral fraction
+         Min_frac = ifelse(is.na(Min_frac), Min_frac_crop, Min_frac),
+         Min_frac = ifelse(is.na(Min_frac), 1, Min_frac)) %>% # we have a default of 1 here
+  drop_na(OC, pH) %>%
+  select(x, y, Sand:BD, OC:Min_frac, Cell_area_km2:Yield_tha) # drop land-use-specific variables and reorder
+
 # process rasters so we can make plots at DA level
-template <- Master_stack[[1]]
+template <- Master_stack[[9]] # sand % makes a good template
 England <- template %>% mask(subset(UK, UK@data[["NAME_1"]]=="England"))
 Northern_Ireland <- template %>% mask(subset(UK, UK@data[["NAME_1"]]=="Northern Ireland"))
 Scotland <- template %>% mask(subset(UK, UK@data[["NAME_1"]]=="Scotland"))
 Wales <- template %>% mask(subset(UK, UK@data[["NAME_1"]]=="Wales"))
 
-Eng_df <- England %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
-NI_df <- Northern_Ireland %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
-Scot_df <- Scotland %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
-Wales_df <- Wales %>% as.data.frame(xy = T) %>% drop_na(PHIHOX_M_sl4_5km_ll)
+Eng_df <- England %>% as.data.frame(xy = T) %>% drop_na(SNDPPT_M_sl4_5km_ll)
+NI_df <- Northern_Ireland %>% as.data.frame(xy = T) %>% drop_na(SNDPPT_M_sl4_5km_ll)
+Scot_df <- Scotland %>% as.data.frame(xy = T) %>% drop_na(SNDPPT_M_sl4_5km_ll)
+Wales_df <- Wales %>% as.data.frame(xy = T) %>% drop_na(SNDPPT_M_sl4_5km_ll)
 
 DA_dat <- bind_rows(list(England = Eng_df, `Northern Ireland` = NI_df, Scotland = Scot_df, Wales = Wales_df), .id = "DA")  %>%
-  dplyr::select(-PHIHOX_M_sl4_5km_ll)
+  dplyr::select(-SNDPPT_M_sl4_5km_ll)
 
 Dat_main <- left_join(Dat_main, DA_dat, by = c("x", "y"))
+Dat_main <- Dat_main %>%
+  select(x, y, DA, Sand:Yield_tha)
 
 # cumulative probability distribution for pH under different crops
 Dat_cdf <- Dat_main %>%
@@ -199,7 +240,6 @@ Dat_cdf_av %>%
          error2 = error ^ 2) %>%
   summarise(error2 = mean(error2)) %>%
   mutate(rmse = sqrt(error2))
-
 
 # use soiltexture package to figure out soil type (details here https://cran.r-project.org/web/packages/soiltexture/vignettes/soiltexture_vignette.pdf)
 Dat_soil <- Dat_main %>%
@@ -299,24 +339,17 @@ rel_yield <- function(A, B, D, pH){
   return(rel_yield)
 }
 
-# function to calculate OM fraction based on C (t/ha) and BD (kg / m2)
-OM_frac <- function(BD_kg_m2, C_t_ha){
-  C_kg_m2 <- C_t_ha * 10^3 * 10^-4 * 1 / 0.3
-  Cfrac <- C_kg_m2 / BD_kg_m2
-  OMfrac <- Cfrac / 0.58 # assumes OM of 58% C
-  return(OMfrac)
-}
+# adjust crop area to reflect fraction under mineral soils (i.e. exclude peat soils)
+Dat_main <- Dat_main %>%
+  mutate(Area_ha = Area_ha * Min_frac)
 
 # function to infer target pH
-target_pH <- function(Crop, pH, BD, OC){
-  
-  OM_frac <- OM_frac(BD, OC)
-  isnt_peat <- OM_frac < 0.2 # assumes 20% threshold for peaty soil (as in RB209)
-  
+target_pH <- function(Crop, pH){
+
   # define target with sequential logicals
   target_pH <- pH # assume baseline is no change
-  target_pH <- ifelse(Crop == "Pasture" & isnt_peat & pH < 6.0, 6.0, target_pH) # 6 target for grass (RB209)
-  target_pH <- ifelse(Crop != "Pasture" & isnt_peat & pH < 6.5, 6.5, target_pH) # 6.5 target for crops (RB209)
+  target_pH <- ifelse(Crop == "Pasture" & pH < 6.0, 6.0, target_pH) # 6 target for grass (RB209)
+  target_pH <- ifelse(Crop != "Pasture" & pH < 6.5, 6.5, target_pH) # 6.5 target for crops (RB209)
   
   return(target_pH)
 }
@@ -324,7 +357,7 @@ target_pH <- function(Crop, pH, BD, OC){
 # yield increases for croplands
 Dat_main <- Dat_main %>%
   mutate(Rel_yield = rel_yield(a_est, b_est, d_est, pH),
-         Target_pH = target_pH(Crop, pH, BD, OC),
+         Target_pH = target_pH(Crop, pH),
          Poss_yield = rel_yield(a_est, b_est, d_est, Target_pH),
          Yield_increase = Poss_yield / Rel_yield,
          pH_diff = Target_pH - pH) %>%
@@ -367,7 +400,7 @@ Dat_main <- Dat_main %>%
 # EI for vegetables based on root crops/onions/cabbages figure from Wallen et al. (2004) (Feedprint doesn't do vegetable EFs)
 # EI for pasture based on feedprint EI for grass silage
 Dat_EI <- tibble(Crop = Dat_main %>% pull(Crop) %>% unique(),
-                 EI = c(343, 465, 1222, 226, 766, 984, 500, 349, 235))
+                 EI = c(235, 343, 465, 1222, 226, 766, 984, 500, 349))
 
 Dat_main <- Dat_main %>%
   left_join(Dat_EI, by = "Crop")
@@ -397,9 +430,9 @@ Dat_main <- Dat_main %>%
 # linseed uses OSR values, potatoes assumes dual purpose and price is weighted according to relative yields
 # vegetables takes data for potatoes — very similar to most veg prices
 Dat_saleval <- tibble(Crop = Dat_main %>% pull(Crop) %>% unique(),
-                      Maincrop_saleval = c(145, 155, 325, 113, 200, 325, 113, 165, 22.5),
-                      Bycrop_saleval = c(55, 50, 0, 0, 0, 0, 0, 50, 0), # secondary crop e.g. straw
-                      Bycrop_ratio = c(0.55, 0.60, 0, 0, 0, 0, 0, 0.53, 0)) # ratio of secondary crop to main crop yield
+                      Maincrop_saleval = c(22.5, 145, 155, 325, 113, 200, 325, 113, 165),
+                      Bycrop_saleval = c(0, 55, 50, 0, 0, 0, 0, 0, 50), # secondary crop e.g. straw
+                      Bycrop_ratio = c(0, 0.55, 0.60, 0, 0, 0, 0, 0, 0.53)) # ratio of secondary crop to main crop yield
 
 # join sale values to main data
 Dat_main <- Dat_main %>% left_join(Dat_saleval, by = "Crop")
@@ -621,13 +654,13 @@ Dat_main <- Dat_main %>%
 
 # calculate GHG balance in tonnes / ha
 Dat_main <- Dat_main %>%
-  mutate(Tot_GHGmit = GHGmit_yield + GHGmit_SOC + GHGmit_N2O,
-         Tot_GHG = Limeemb_GHG + Limedir_GHG + Dies_GHG,
-         GHG_balance = Tot_GHG - Tot_GHGmit)
+  mutate(Tot_GHGmit = GHGmit_yield + GHGmit_SOC + GHGmit_N2O, # tonnes CO2-eq / ha
+         Tot_GHG = Limeemb_GHG + Limedir_GHG + Dies_GHG, # tonnes CO2-eq / ha
+         GHG_balance = Tot_GHG - Tot_GHGmit) # GHG balance (sources - sinks, tonnes CO2-eq / ha)
 
 # calculate abatement and MAC
 Dat_main <- Dat_main %>%
-  mutate(Abatement = -GHG_balance * Area_ha,
+  mutate(Abatement = -GHG_balance * Area_ha, # abatement for full crop area in grid cell, tonnes CO2-eq
          Abatement_SOConly = -(Tot_GHG - GHGmit_SOC) * Area_ha,
          Abatement_EIonly = -(Tot_GHG - GHGmit_yield) * Area_ha,
          Abatement_N2Oonly = -(Tot_GHG - GHGmit_N2O) * Area_ha,
