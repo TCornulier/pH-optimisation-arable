@@ -57,6 +57,7 @@ ggsave(find_onedrive(dir = data_repo, path = "Output plots/Abatement map UK disc
 ##########################
 
 Dat_main %>%
+  filter(GHG_balance <= -0.1) %>%
   group_by(x, y) %>%
   summarise(Abatement = sum(Abatement),
             Area_ha = sum(Area_ha),
@@ -67,7 +68,8 @@ Dat_main %>%
   geom_raster(aes(x = x, y = y, fill = Abatement_ha), alpha = 0.7) +
   geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
   #scale_fill_gradient2(low = "darkred", mid = "white", high = "darkgreen") +
-  scale_fill_distiller(palette = "YlGnBu") +
+  scale_fill_gradient(low = "white", high = "darkgreen") +
+  #scale_fill_distiller(palette = "YlGnBu") +
   labs(fill = expression("Abatement\npotential\n(tonnes CO"[2]*"-eq ha"^{-1}*")")) +
   coord_quickmap() +
   theme_void()
@@ -91,9 +93,10 @@ qplot(Dat_summ2$MAC)
 Dat_summ2$MAC %>% summary()
 
 ggplot() +
-  geom_raster(data = Dat_summ2, aes(x = x, y = y, fill = MAC)) +
+  geom_raster(data = Dat_summ2, aes(x = x, y = y, fill = MAC), alpha = 0.8) +
   geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
   #scale_fill_gradient(high = "red", low = "darkgreen") +
+  scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkred") +
   labs(fill = expression('Marginal\nabatement\ncost\n(£ tonne CO'[2]*'-eq'^{-1}*')')) +
   coord_quickmap() +
   theme_void()
@@ -171,8 +174,8 @@ below_scc <- Dat_main %>%
 Dat_main %>%
   filter(GHG_balance <= -0.1) %>% # only cells with reliable mitigation (i.e. < 100 kg CO2-eq / ha / year) included
   dplyr::select(MAC, Abatement, Crop) %>%
-  filter(MAC >= quantile(MAC, 0.05),
-         MAC <= quantile(MAC, 0.95)) %>%
+  filter(MAC >= quantile(MAC, 0.025),
+         MAC <= quantile(MAC, 0.975)) %>%
   arrange(MAC) %>%
   mutate(Abatement = Abatement * 10^-3,
          xmax = cumsum(Abatement),
