@@ -6,10 +6,14 @@ library(rpart)
 # load workspace
 load("Full model output df.RData")
 
+# drop out that one row where N2O model misfired
+Dat_main <- Dat_main %>% filter(!is.na(Abatement))
+
 # pull out primary data and classifier for simplified decision tree model
 Dat_model <- Dat_main %>%
   mutate(has_abatement = as.numeric(GHG_balance <= -0.1),
          is_cost_effective = as.numeric(MAC <= 66.1),
+         #is_cost_effective = as.numeric(MAC <= 0),
          has_ce_abatement = as.numeric(has_abatement + is_cost_effective == 2)) %>%
   select(pH:OC, Crop, Yield_tha, has_ce_abatement)
 

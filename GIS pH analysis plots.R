@@ -112,7 +112,7 @@ names(Crop_colours) <- c("Oil crops, other", "Potato", "Pasture", "Vegetable", "
                          "Wheat", "Barley", "Pulses, other", "Cereals, other")
 
 Dat_main %>%
-  filter(Crop != "Pasture") %>% # too dominant!
+  #filter(Crop != "Pasture") %>% # dominant but hard to justify its exclusion
   group_by(x, y) %>%
   mutate(Dom_crop = Area_ha == max(Area_ha)) %>%
   filter(Dom_crop == T) %>%
@@ -122,12 +122,30 @@ Dat_main %>%
   #add_row(Crop = "Vegetable") %>%
   ggplot() +
   geom_raster(aes(x = x, y = y, fill = Crop)) +
-  geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
+  #geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
   scale_fill_manual(values = Crop_colours) +
   labs(fill = "") +
   coord_quickmap() +
   theme_void()
 ggsave(find_onedrive(dir = data_repo, path = "Output plots/Dominant arable crop map UK.png"), width = 8, height = 7)
+
+##########################
+# faceted crop distribution map
+##########################
+
+Dat_main %>%
+  mutate(Area_pc = (Area_ha * 10^-2) / Cell_area_km2 * 100) %>%
+  filter(Area_pc > 1) %>%
+  filter(Crop != "Oil crops, other") %>%
+  ggplot() +
+  geom_raster(aes(x = x, y = y, fill = Area_pc)) +
+  geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
+  scale_fill_continuous(trans = "log2", breaks = c(2.5, 5, 10, 20, 40, 80), low = "white", high = "darkgreen") +
+  facet_wrap(~ Crop, nrow = 2) +
+  labs(fill = "Cell area under crop (%)") +
+  coord_quickmap() +
+  theme_void()
+ggsave(find_onedrive(dir = data_repo, path = "Output plots/Arable crop fractional area maps.png"), width = 8, height = 4)
 
 ##########################
 # pH map of UK
@@ -187,6 +205,7 @@ Dat_main %>%
   ggplot() +
   geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = Crop), colour = NA) + # main MACC
   geom_rect(aes(xmin = below_scc, xmax = max(xmax), ymin = 0, ymax = max(ymax)), fill = "white", colour = NA, alpha = 0.035) + # grey out values @ > SCC
+  #geom_hline(yintercept = 0, size = 0.1, colour = "darkred", lty = 2) +
   geom_hline(yintercept = SCC, size = 0.1, colour = "darkred", lty = 2) +
   geom_vline(xintercept = below_zero, size = 0.1, colour = "grey", lty = 1) +
   geom_vline(xintercept = below_scc, size = 0.05, colour = "grey", lty = 1) +
