@@ -251,7 +251,7 @@ DEFRA_LF %>%
   gather(-Soil_type, key = `Land use`, value = `Liming factor`) %>%
   spread(key = Soil_type, value = `Liming factor`) %>%
   mutate(`Land use` = `Land use` %>% str_replace("Liming_factor_", "") %>% first_upper()) %>%
-  write_csv("Output plots/Table 1 (Defra_LFs).csv")
+  write_csv(find_onedrive(dir = data_repo, path = "Output plots/Table 1 (Defra_LFs).csv"))
 
 # table 1 caption
 tibble(abbrev = DEFRA_LF$Soil_type) %>%
