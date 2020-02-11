@@ -71,4 +71,4 @@ summary(cont_model) # ns, which is good — variation comes from other factors
 Grass_SOC_RR_year <- (as.numeric(treat_model$coefficients[2] - cont_model$coefficients[2]) / mean(c(Dat_grass$control[1], Dat_grass$treatment[1]))) / (Grass_pH$pH[2] - Grass_pH$pH[1])
 
 # write out final functions/factors for use in main model
-save(Crop_SOC_RR_year, Grass_SOC_RR_year, file = "SOC response functions.RData")
+save(Crop_SOC_RR_year, SOC_RR_model, Grass_SOC_RR_year, file = "SOC response functions.RData")

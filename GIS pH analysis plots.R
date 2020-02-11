@@ -96,7 +96,7 @@ ggplot() +
   geom_raster(data = Dat_summ2, aes(x = x, y = y, fill = MAC), alpha = 0.8) +
   geom_polygon(data = UK, aes(x = long, y = lat, group = group), colour = "black", fill = NA, size = 0.5) +
   #scale_fill_gradient(high = "red", low = "darkgreen") +
-  scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkred") +
+  scale_fill_gradient2(low = "darkgreen", mid = "lightgrey", high = "darkred") +
   labs(fill = expression('Marginal\nabatement\ncost\n(£ tonne CO'[2]*'-eq'^{-1}*')')) +
   coord_quickmap() +
   theme_void()
@@ -111,6 +111,7 @@ Crop_colours <- brewer.pal(9, "Pastel1") # can change up if desired
 names(Crop_colours) <- c("Oil crops, other", "Potato", "Pasture", "Vegetable", "Rapeseed",
                          "Wheat", "Barley", "Pulses, other", "Cereals, other")
 
+# no longer used
 Dat_main %>%
   #filter(Crop != "Pasture") %>% # dominant but hard to justify its exclusion
   group_by(x, y) %>%
@@ -127,7 +128,7 @@ Dat_main %>%
   labs(fill = "") +
   coord_quickmap() +
   theme_void()
-ggsave(find_onedrive(dir = data_repo, path = "Output plots/Dominant arable crop map UK.png"), width = 8, height = 7)
+#ggsave(find_onedrive(dir = data_repo, path = "Output plots/Dominant arable crop map UK.png"), width = 8, height = 7)
 
 ##########################
 # faceted crop distribution map
@@ -176,7 +177,7 @@ SCC <- 66.1
 below_zero <- Dat_main %>%
   filter(GHG_balance <= -0.1) %>%
   dplyr::select(MAC, Abatement, Crop) %>%
-  filter(MAC >= quantile(MAC, 0.05),
+  filter(#MAC >= quantile(MAC, 0.025),
          MAC <= 0) %>%
   pull(Abatement) %>%
   sum() * 10^-3
@@ -184,7 +185,7 @@ below_zero <- Dat_main %>%
 below_scc <- Dat_main %>%
   filter(GHG_balance <= -0.1) %>%
   dplyr::select(MAC, Abatement, Crop) %>%
-  filter(MAC >= quantile(MAC, 0.05),
+  filter(#MAC >= quantile(MAC, 0.025),
          MAC <= SCC) %>%
   pull(Abatement) %>%
   sum() * 10^-3
@@ -192,8 +193,8 @@ below_scc <- Dat_main %>%
 Dat_main %>%
   filter(GHG_balance <= -0.1) %>% # only cells with reliable mitigation (i.e. < 100 kg CO2-eq / ha / year) included
   dplyr::select(MAC, Abatement, Crop) %>%
-  filter(MAC >= quantile(MAC, 0.025),
-         MAC <= quantile(MAC, 0.975)) %>%
+  #filter(MAC >= quantile(MAC, 0.025),
+  #       MAC <= quantile(MAC, 0.975)) %>%
   arrange(MAC) %>%
   mutate(Abatement = Abatement * 10^-3,
          xmax = cumsum(Abatement),
@@ -204,7 +205,7 @@ Dat_main %>%
          is_above_scc = MAC >= SCC) %>%
   ggplot() +
   geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = Crop), colour = NA) + # main MACC
-  geom_rect(aes(xmin = below_scc, xmax = max(xmax), ymin = 0, ymax = max(ymax)), fill = "white", colour = NA, alpha = 0.035) + # grey out values @ > SCC
+  geom_rect(aes(xmin = below_scc, xmax = max(xmax), ymin = 0, ymax = max(ymax)), fill = "white", colour = NA, alpha = 0.027) + # grey out values @ > SCC
   #geom_hline(yintercept = 0, size = 0.1, colour = "darkred", lty = 2) +
   geom_hline(yintercept = SCC, size = 0.1, colour = "darkred", lty = 2) +
   geom_vline(xintercept = below_zero, size = 0.1, colour = "grey", lty = 1) +
@@ -392,27 +393,37 @@ yield_inc_ab_grass / d2b
 #####################
 # emissions + abatement
 ####################
+# GHG mitigation total
+Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Tot_GHGmit = Tot_GHGmit * Area_ha) %>% pull(Tot_GHGmit) %>% sum() * 10^-3
+Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Tot_GHGmit) %>% mean()
 
 # SCS offset total
 Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(GHGmit_SOC = GHGmit_SOC * Area_ha) %>% pull(GHGmit_SOC) %>% sum() * 10^-3
+Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(GHGmit_SOC) %>% mean()
 
 # EI reduction total
 Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(GHGmit_yield = GHGmit_yield * Area_ha) %>% pull(GHGmit_yield) %>% sum() * 10^-3
+Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(GHGmit_yield) %>% mean()
 
 # N2O mitigation total
 Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(GHGmit_N2O = GHGmit_N2O * Area_ha) %>% pull(GHGmit_N2O) %>% sum() * 10^-3
+Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(GHGmit_N2O) %>% mean()
 
 # GHG emissions total
 Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Tot_GHG = Tot_GHG * Area_ha) %>% pull(Tot_GHG) %>% sum() * 10^-3
+Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Tot_GHG) %>% mean()
 
 # direct lime emissions total
 Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Limedir_GHG = Limedir_GHG * Area_ha) %>% pull(Limedir_GHG) %>% sum() * 10^-3
+Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Limedir_GHG) %>% mean()
 
 # embedded lime emissions total
 Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Limeemb_GHG = Limeemb_GHG * Area_ha) %>% pull(Limeemb_GHG) %>% sum() * 10^-3
+Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Limeemb_GHG) %>% mean()
 
 # fieldwork emissions total
 Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Dies_GHG = Dies_GHG * Area_ha) %>% pull(Dies_GHG) %>% sum() * 10^-3
+Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Dies_GHG) %>% mean()
 
 # GHG mitigation by SCS per hectare
 Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(GHGmit_SOC = GHGmit_SOC / Area_ha) %>% pull(GHGmit_SOC) %>% mean()
@@ -459,11 +470,6 @@ d7 / (d2 * 10^3)
 # MAC 95% CI
 Dat_main %>% filter(GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), MAC <= quantile(MAC, 0.95)) %>% pull(MAC) %>% quantile(c(0.025, 0.975))
 
-# abatement available below SCC (£66.10)
-d8 <- Dat_main %>% filter(GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), MAC <= quantile(MAC, 0.95)) %>% nrow()
-d9 <- Dat_main %>% filter(GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), MAC <= quantile(MAC, 0.95)) %>% filter(MAC <= 66.1) %>% nrow()
-d9/d8
-
 # % of total uk emissions and uk agricultural emissions
 abatement_Mt <- Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Abatement) %>% sum() * 10^-6
 abatement_Mt / 45.59 * 10^2 # % of ag emissions
@@ -499,13 +505,3 @@ Dat_main %>%
   theme_classic()
 ggsave(find_onedrive(dir = data_repo, path = "Output plots/Headline area x crop x DA.png"), width = 8, height = 7)
 
-ggplot(SOC_dat %>% filter(Experiment != "Tu")) +
-  geom_point(aes(x = pH_std2, y = SOC_std2, shape = Experiment, colour = Experiment), alpha = 0.3) +
-  geom_smooth(aes(x = pH_std2, y = SOC_std2), method = "loess", span = 1, lty = 2, size = 0.5, colour = "black", se = T) +
-  scale_x_continuous(breaks = 3:8) +
-  xlim(c(3, 8)) +
-  ylim(c(0, 30)) +
-  labs(x = "pH, standardised",
-       y = expression("SOC stocks (g kg"^{-1}*"), standardised")) +
-  theme_classic()
-ggsave(find_onedrive(dir = data_repo, path = "Output plots/SOC model plot.png"), width = 8, height = 7)

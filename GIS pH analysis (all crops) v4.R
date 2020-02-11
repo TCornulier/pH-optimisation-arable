@@ -198,7 +198,7 @@ ggplot(Dat_cdf, aes(x = pH, y = Freq, colour = Crop)) +
   theme_classic()
 
 Dat_cdf_av <- Dat_cdf %>%
-  filter(Crop != "Pasture") %>%
+  #filter(Crop != "Pasture") %>%
   group_by(pH) %>%
   summarise(Area_ha = sum(Area_ha)) %>%
   arrange(pH) %>%
@@ -378,17 +378,16 @@ Dat_main <- Dat_main %>%
 #                                 Poss_yield / Rel_yield,
 #                                 Yield_increase))
 
-# load SOC response curve function derived in separate script and apply to main data
+# load SOC response curve functions derived in separate script and apply to main data
 # function output is fractional
-source("SOC RC function v2.R")
+load("SOC response functions.RData")
 
 Dat_main <- Dat_main %>%
-  mutate(SOCchange_frac = SOC_RC(ipH = pH, fpH = Target_pH))
+  mutate(SOCchange_frac = Crop_SOC_RR_year(pH_diff = pH_diff) * 20)
 
 # add in pasture cases - C sequestration predictions using data from Fornara et al. (2011)
-
 Dat_main <- Dat_main %>%
-  mutate(SOCchange_frac = ifelse(Crop == "Pasture", 1 + C_response_fac_grass * pH_diff * 20, SOCchange_frac))
+  mutate(SOCchange_frac = ifelse(Crop == "Pasture", Grass_SOC_RR_year * pH_diff * 20, SOCchange_frac))
 
 # we avoided dropping crops without matched models earlier to allow us to add in pasture using a different approach;
 # now we need to drop those crops which still have no data for yield etc.
@@ -414,7 +413,8 @@ Dat_main <- Dat_main %>%
 
 # calculate emissions mitigation from SOC accumulation
 Dat_main <- Dat_main %>%
-  mutate(OC_lime = OC * SOCchange_frac,
+  mutate(OC = ifelse(Crop != "Pasture", OC * 0.7, OC), # from IPCC 2019 guidelines, FLU for cropland
+         OC_lime = OC + OC * SOCchange_frac,
          GHGmit_SOC = ((OC_lime - OC) * 44/12) / 20)
 
 # calculate emissions from lime application
@@ -584,7 +584,7 @@ OC_perc <- function(BD_kg_m2, C_t_ha){
 Dat_model <- Dat_model %>%
   mutate(Is_grass = Crop == "Pasture",
          C_perc_initial = OC_perc(BD, OC),
-         C_perc_final = C_perc_initial * SOCchange_frac)
+         C_perc_final = C_perc_initial * (1 + SOCchange_frac))
 
 #################
 # Make predictions with N2O model
@@ -668,4 +668,4 @@ Dat_main <- Dat_main %>%
          MAC = Cost_net / Abatement)
 
 # save .RData for plots and decision tree model
-save(Dat_main, UK, Dat_cdf, SOC_dat, file = "Full model output df.RData")
+save(Dat_main, UK, Dat_cdf, file = "Full model output df.RData")
