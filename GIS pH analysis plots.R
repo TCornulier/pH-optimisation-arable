@@ -425,13 +425,10 @@ Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Limeemb_GHG) %>% mean()
 Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Dies_GHG = Dies_GHG * Area_ha) %>% pull(Dies_GHG) %>% sum() * 10^-3
 Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Dies_GHG) %>% mean()
 
-# GHG mitigation by SCS per hectare
-Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(GHGmit_SOC = GHGmit_SOC / Area_ha) %>% pull(GHGmit_SOC) %>% mean()
-
 # fractional area between Hamilton's magic 5—6.7 bracket
 d3 <- Dat_main %>% pull(Area_ha) %>% sum() # total area
-d4 <- Dat_main %>% filter(pH >= 5, pH <= 6.7) %>% pull(Area_ha) %>% sum()
-d4
+d4 <- Dat_main %>% filter(pH >= 5, pH <= 6.5) %>% pull(Area_ha) %>% sum()
+d4 * 10^-6
 d4/d3
 
 #############
@@ -452,20 +449,22 @@ Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(Abatement = Abatement - GHGm
 ##################
 
 # cost of measure on area with net abatement
-d5 <- Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(x = Area_ha * (Lime_cost + Cont_cost)) %>% pull(x) %>% sum()
-d5 / (d2 * 10^3)
+d5a <- Dat_main %>% filter(Crop != "Pasture", GHG_balance <= -0.1) %>% mutate(x = Area_ha * (Lime_cost + Cont_cost)) %>% pull(x) %>% sum()
+d5b <- Dat_main %>% filter(Crop == "Pasture", GHG_balance <= -0.1) %>% mutate(x = Area_ha * (Lime_cost + Cont_cost)) %>% pull(x) %>% sum()
+d5a / (d2a * 10^3) # total cost, GBP / ha arable
+d5b / (d2b * 10^3) # total cost, GBP / ha grass
 
 # revenue from crop yield increase on area with net abatement
-d6 <- Dat_main %>% filter(GHG_balance <= -0.1) %>% mutate(x = Area_ha * Crop_revenue_net) %>% pull(x) %>% sum()
-d6 / (d2 * 10^3)
-
-# revenue from crop yield increase on total area
-d7 <- Dat_main %>% mutate(x = Area_ha * Crop_revenue_net) %>% pull(x) %>% sum()
-d7 / (d1 * 10^3)
+d6a <- Dat_main %>% filter(Crop != "Pasture", GHG_balance <= -0.1) %>% mutate(x = Area_ha * Crop_revenue_net) %>% pull(x) %>% sum()
+d6b <- Dat_main %>% filter(Crop == "Pasture", GHG_balance <= -0.1) %>% mutate(x = Area_ha * Crop_revenue_net) %>% pull(x) %>% sum()
+d6a / (d2a * 10^3) # revenue, GBP / ha arable
+d6b / (d2b * 10^3) # revenue, GBP / ha grass
 
 # marginal abatement cost, overall average
-d7 <- Dat_main %>% filter(GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), MAC <= quantile(MAC, 0.95)) %>% mutate(x = Area_ha * MAC) %>% pull(x) %>% sum()
-d7 / (d2 * 10^3)
+d7a <- Dat_main %>% filter(Crop != "Pasture", GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), MAC <= quantile(MAC, 0.95)) %>% mutate(x = Area_ha * MAC) %>% pull(x) %>% sum()
+d7b <- Dat_main %>% filter(Crop == "Pasture", GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), MAC <= quantile(MAC, 0.95)) %>% mutate(x = Area_ha * MAC) %>% pull(x) %>% sum()
+d7a / (d2a * 10^3)
+d7b / (d2b * 10^3)
 
 # MAC 95% CI
 Dat_main %>% filter(GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), MAC <= quantile(MAC, 0.95)) %>% pull(MAC) %>% quantile(c(0.025, 0.975))
