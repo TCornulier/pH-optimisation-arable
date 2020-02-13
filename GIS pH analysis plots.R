@@ -108,6 +108,7 @@ ggsave(find_onedrive(dir = data_repo, path = "Output plots/MAC map UK.png"), wid
 
 # first make named list for crop categories
 Crop_colours <- brewer.pal(9, "Pastel1") # can change up if desired
+Crop_colours[9] <- "#e7e1ef" # the default grey is too easily confused with our greyed-out >SCC MAC values
 names(Crop_colours) <- c("Oil crops, other", "Potato", "Pasture", "Vegetable", "Rapeseed",
                          "Wheat", "Barley", "Pulses, other", "Cereals, other")
 
@@ -461,16 +462,19 @@ d6a / (d2a * 10^3) # revenue, GBP / ha arable
 d6b / (d2b * 10^3) # revenue, GBP / ha grass
 
 # marginal abatement cost, overall average
-d7a <- Dat_main %>% filter(Crop != "Pasture", GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), MAC <= quantile(MAC, 0.95)) %>% mutate(x = Area_ha * MAC) %>% pull(x) %>% sum()
-d7b <- Dat_main %>% filter(Crop == "Pasture", GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), MAC <= quantile(MAC, 0.95)) %>% mutate(x = Area_ha * MAC) %>% pull(x) %>% sum()
+d7a <- Dat_main %>% filter(Crop != "Pasture", GHG_balance <= -0.1) %>% mutate(x = Area_ha * MAC) %>% pull(x) %>% sum()
+d7b <- Dat_main %>% filter(Crop == "Pasture", GHG_balance <= -0.1) %>% mutate(x = Area_ha * MAC) %>% pull(x) %>% sum()
 d7a / (d2a * 10^3)
 d7b / (d2b * 10^3)
 
 # MAC 95% CI
-Dat_main %>% filter(GHG_balance <= -0.1) %>% filter(MAC >= quantile(MAC, 0.05), MAC <= quantile(MAC, 0.95)) %>% pull(MAC) %>% quantile(c(0.025, 0.975))
+Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(MAC) %>% quantile(c(0.025, 0.975))
+
+# abatement below SCC (frac)
+below_scc / (Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Abatement) %>% sum() * 10^-3)
 
 # % of total uk emissions and uk agricultural emissions
-abatement_Mt <- Dat_main %>% filter(GHG_balance <= -0.1) %>% pull(Abatement) %>% sum() * 10^-6
+abatement_Mt <- Dat_main %>% filter(GHG_balance <= -0.1, MAC <= SCC) %>% pull(Abatement) %>% sum() * 10^-6
 abatement_Mt / 45.59 * 10^2 # % of ag emissions
 
 # abatement fractions by DA
@@ -480,6 +484,33 @@ Dat_main %>%
   mutate(abatement_frac = Abatement / sum(Abatement)) %>%
   group_by(DA) %>%
   summarise(abatement_frac = sum(abatement_frac))
+
+# area on peat
+full_crop_area <- Dat_main %>%
+  filter(Crop != "Pasture") %>%
+  mutate(Area_ha = Area_ha / Min_frac) %>% # readjust to full area
+  pull(Area_ha) %>%
+  sum()
+
+min_crop_area <- Dat_main %>%
+  filter(Crop != "Pasture") %>%
+  pull(Area_ha) %>%
+  sum()
+
+1 - min_crop_area / full_crop_area # fractional area on peat, cropland
+
+full_grass_area <- Dat_main %>%
+  filter(Crop == "Pasture") %>%
+  mutate(Area_ha = Area_ha / Min_frac) %>% # readjust to full area
+  pull(Area_ha) %>%
+  sum()
+
+min_grass_area <- Dat_main %>%
+  filter(Crop == "Pasture") %>%
+  pull(Area_ha) %>%
+  sum()
+
+1 - min_grass_area / full_grass_area # fractional area on peat, grassland
 
 # bar plot showing abatement crops/DAs
 order <- Dat_main %>%
